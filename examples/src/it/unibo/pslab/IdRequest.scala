@@ -1,7 +1,6 @@
 package it.unibo.pslab
 
 import it.unibo.pslab.multiparty.MultiParty.*
-import it.unibo.pslab.multiparty.MultiParty.MultiParty
 import it.unibo.pslab.peers.Peers.Multiplicity.*
 
 import java.util.UUID
@@ -12,13 +11,14 @@ object IdRequest:
 
   def idRequestProgram: MultiParty[Unit] = for
     cid <- placed[UUID, IdRequester](UUID.randomUUID())
-    cidOnProvider <- unicast[UUID, IdRequester, IdProvider](cid)
-    assignedId <- placed[(UUID, Int), IdProvider]:
-      await(cidOnProvider).map(id => (id, id.hashCode().abs % 1000))
-    assignedIdOnRequester <- multicast[(UUID, Int), IdProvider, IdRequester](assignedId)
-    _ <- placed[Unit, IdRequester]:
+    cidOnProvider <- funnel[UUID, IdRequester, IdProvider](cid)
+    assignedId <- placed[Selected[Int], IdProvider]:
       for 
-        ids <- awaitAll(assignedIdOnRequester)
-        id = ids.find(_._1 == cid).map(_._2)
-      yield println(s"IdRequester received assigned ID: ${id.getOrElse(-1)}")
+        requests <- awaitAll(cidOnProvider)
+        assigned <- selectProviders[Int, IdProvider, IdRequester](Map.empty)
+      yield assigned
+    assignedIdOnRequester <- selectiveMulticast[Int, IdProvider, IdRequester](assignedId)
+    _ <- placed[Unit, IdRequester]:
+      for id <- await(assignedIdOnRequester)
+      yield println(s"IdRequester received assigned ID: $id")
   yield ()

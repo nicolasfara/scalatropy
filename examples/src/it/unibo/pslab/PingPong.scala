@@ -20,7 +20,7 @@ object Multiparty:
   yield pingPong(newCounterOnPinger)
 
 @main
-def main() =
+def main(): Unit =
     println("Multiparty Ping-Pong example defined.")
     val program = Multiparty.pingPongProgram
     println(program)

@@ -15,7 +15,7 @@ object MainWorker:
       for
         peers <- remotes[Worker]()
         allocation = peers.map(_ -> Task(scala.util.Random.nextInt(100))).toMap
-        message <- selectProviders[Task, Main, Worker](allocation)(Task(-1))
+        message <- anisotropicProvider[Task, Main, Worker](allocation)(Task(-1))
       yield message
     taskOnWorker <- anisotropic[Task, Main, Worker](task)
     _ <- placed[Unit, Worker]:

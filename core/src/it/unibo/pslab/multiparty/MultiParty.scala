@@ -18,7 +18,7 @@ object MultiParty:
 
   trait Many[+V]
 
-  trait Aniso[+V]
+  trait PerPeer[+V]
 
   trait Remote[-P <: Peer]
 
@@ -34,7 +34,7 @@ object MultiParty:
 //        extends MultiPartyGrammar[V on To]
 //    case Isotropic[V, From <: TieToMultiple[To], To <: TieToSingle[From]](value: V on From)
 //        extends MultiPartyGrammar[V on To]
-    case Anisotropic[V, From <: TieToMultiple[To], To <: TieToSingle[From]](value: Aniso[V] on From)
+    case SendPerPeer[V, From <: TieToMultiple[To], To <: TieToSingle[From]](value: PerPeer[V] on From)
         extends MultiPartyGrammar[V on To]
 //    case Funnel[V, From <: TieToSingle[To], To <: TieToMultiple[From]](value: V on From)
 //        extends MultiPartyGrammar[Many[V] on To]
@@ -42,8 +42,8 @@ object MultiParty:
         extends MultiPartyGrammar[PlacedKind[From, To, V]]
     case Await[V, P <: Peer: PeerScope](placed: V on P) extends MultiPartyGrammar[V]
     case AwaitAll[V, P <: Peer: PeerScope](placed: Many[V] on P) extends MultiPartyGrammar[Map[Remote[?], V]]
-    case AnisotropicProvider[V, From <: TieToMultiple[To], To <: Peer](value: PartialFunction[Remote[To], V])
-        extends MultiPartyGrammar[Aniso[V]]
+    case ForEachPeer[V, From <: TieToMultiple[To], To <: Peer](value: PartialFunction[Remote[To], V])
+        extends MultiPartyGrammar[PerPeer[V]]
     case Remotes[P <: Peer]() extends MultiPartyGrammar[Iterable[Remote[P]]]
 
   type MultiParty[T] = Free[MultiPartyGrammar, T]
@@ -77,15 +77,15 @@ object MultiParty:
 //  ): MultiParty[V on To] =
 //    Free.liftF(MultiPartyGrammar.Isotropic[V, From, To](value))
 //
-  inline def anisotropic[V, From <: TieToMultiple[To], To <: TieToSingle[From]](
-      inline value: Aniso[V] on From
+  inline def commPerPeer[V, From <: TieToMultiple[To], To <: TieToSingle[From]](
+      inline value: PerPeer[V] on From
   ): MultiParty[V on To] =
-    Free.liftF(MultiPartyGrammar.Anisotropic[V, From, To](value))
+    Free.liftF(MultiPartyGrammar.SendPerPeer[V, From, To](value))
 
-  inline def anisotropicProvider[V, From <: TieToMultiple[To], To <: Peer](
+  inline def forEachPeer[V, From <: TieToMultiple[To], To <: Peer](
       inline value: PartialFunction[Remote[To], V]
-  ): MultiParty[Aniso[V]] =
-    Free.liftF(MultiPartyGrammar.AnisotropicProvider[V, From, To](value))
+  ): MultiParty[PerPeer[V]] =
+    Free.liftF(MultiPartyGrammar.ForEachPeer[V, From, To](value))
 //
 //  inline def funnel[V, From <: TieToSingle[To], To <: TieToMultiple[From]](
 //      inline value: V on From

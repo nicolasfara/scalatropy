@@ -17,7 +17,7 @@ object IdRequest:
 
   def idRequestProgram: MultiParty[Unit] = for
     cid <- placed[UUID, IdRequester](UUID.randomUUID())
-    cidOnProvider <- comm[UUID, IdRequester, IdProvider](cid): MultiParty[Many[UUID] on IdProvider]
+    cidOnProvider <- comm[UUID, IdRequester, IdProvider](cid)
     assignedId <- placed[PerPeer[Int], IdProvider]:
       awaitAll(cidOnProvider) >>= assignTask
     assignedIdOnRequester <- commPerPeer[Int, IdProvider, IdRequester](assignedId)

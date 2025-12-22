@@ -126,5 +126,7 @@ hs_err_pid*
 
 .bsp
 
+.metals/
+
 # End of https://www.toptal.com/developers/gitignore/api/mill,scala,intellij
 

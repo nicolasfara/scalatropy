@@ -6,16 +6,17 @@ import it.unibo.pslab.peers.Peers.TieTo.*
 import java.util.UUID
 import scala.util.Random
 import it.unibo.pslab.multiparty.Language.*
+import it.unibo.pslab.peers.Peers.Peer
 
 object IdRequest:
   type IdProvider <: TieToMultiple[IdRequester]
   type IdRequester <: TieToSingle[IdProvider]
 
-  private def assignTask(requests: Map[Remote[?], UUID])(using LocalPeer): MultiParty[PerPeer[Int]] =
+  private def assignTask[Local <: Peer : LocalPeer](requests: Map[Remote[?], UUID]): MultiParty[PerPeer[Int]] =
     val assignments = requests.map
     forEachPeer[IdProvider, IdRequester](requests.map(_._1 -> Random.nextInt()))
 
-  def idRequestProgram(using LocalPeer): MultiParty[Unit] = for
+  def idRequestProgram[Local <: Peer : LocalPeer]: MultiParty[Unit] = for
     cid <- on[IdRequester](UUID.randomUUID())
     cidOnProvider <- comm[IdRequester, IdProvider](cid)
     assignedId <- on[IdProvider]:

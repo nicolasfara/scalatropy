@@ -9,4 +9,4 @@ object MultiParty:
   trait PerPeer[+V]
   trait Remote[-P <: Peer]
 
-  trait LocalPeer
+  trait LocalPeer[P <: Peer]

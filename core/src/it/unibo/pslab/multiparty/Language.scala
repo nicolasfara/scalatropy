@@ -23,33 +23,32 @@ object Language:
   type MultiParty[T] = Free[MultiPartyGrammar, T]
 
   @nowarn
-  inline def on[P <: Peer](using lp: LocalPeer)[V](body: PeerScope[P] ?=> MultiParty[V] | V): MultiParty[V on P] =
+  inline def on[P <: Peer](using lp: LocalPeer[?])[V](body: PeerScope[P] ?=> MultiParty[V] | V): MultiParty[V on P] =
     given ps: PeerScope[P] = new PeerScope[P] {}
     Free.liftF(MultiPartyGrammar.On[V, P](lp)(_ => body))
 
   inline def comm[From <: TieTo[To], To <: TieTo[From]](using
-      lp: LocalPeer
+      lp: LocalPeer[?]
   )[V](value: V on From): MultiParty[PlacedKind[From, To, V]] =
     Free.liftF(MultiPartyGrammar.Comm[V, From, To](lp)(value))
 
   inline def commPerPeer[From <: TieTo.TieToMultiple[To], To <: TieTo.TieToSingle[From]](using
-      lp: LocalPeer
+      lp: LocalPeer[?]
   )[V](value: PerPeer[V] on From): MultiParty[V on To] =
     Free.liftF(MultiPartyGrammar.CommPerPeer[V, From, To](lp)(value))
 
   inline def forEachPeer[From <: TieTo.TieToMultiple[To], To <: Peer](using
-      lp: LocalPeer
+      lp: LocalPeer[?]
   )[V](body: PartialFunction[Remote[To], V]): MultiParty[PerPeer[V]] =
     Free.liftF(MultiPartyGrammar.ForEachPeer[V, From, To](lp)(body))
 
-  inline def asLocal[P <: Peer: PeerScope](using lp: LocalPeer)[V](placed: V on P): MultiParty[V] =
+  inline def asLocal[P <: Peer: PeerScope](using lp: LocalPeer[?])[V](placed: V on P): MultiParty[V] =
     Free.liftF(MultiPartyGrammar.AsLocal[V, P](lp)(placed))
 
-  @nowarn
   inline def asLocalAll[P <: Peer: PeerScope](using
-      lp: LocalPeer
+      lp: LocalPeer[?]
   )[V](placed: Many[V] on P): MultiParty[Map[Remote[?], V]] =
     Free.liftF(MultiPartyGrammar.AsLocalAll[V, P](lp)(placed))
 
-  inline def remotes[RP <: Peer](using lp: LocalPeer)[L <: Peer: PeerScope]: MultiParty[Iterable[Remote[RP]]] =
+  inline def remotes[RP <: Peer](using lp: LocalPeer[?])[L <: Peer: PeerScope]: MultiParty[Iterable[Remote[RP]]] =
     Free.liftF(MultiPartyGrammar.Remotes[RP, L](lp))

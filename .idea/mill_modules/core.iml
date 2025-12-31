@@ -1,18 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <module type="JAVA_MODULE" version="4">
-    <component name="NewModuleRootManager">
-        <output url="file://$MODULE_DIR$/../../out/core/internalGenIdea/ideaCompileOutput.dest/classes"/>
-        <exclude-output/>
-        <content url="file://$MODULE_DIR$/../../core">
-            <sourceFolder url="file://$MODULE_DIR$/../../core/src" isTestSource="false"/>
-            <sourceFolder url="file://$MODULE_DIR$/../../core/resources" type="java-resource"/>
-        </content>
-        <orderEntry type="inheritedJdk"/>
-        <orderEntry type="sourceFolder" forTests="false"/>
-        <orderEntry type="library" name="scala-SDK-3.7.4" level="project"/>
-        <orderEntry type="library" name="cats-core_3-2.13.0.jar" level="project"/>
-        <orderEntry type="library" name="cats-free_3-2.13.0.jar" level="project"/>
-        <orderEntry type="library" name="cats-kernel_3-2.13.0.jar" level="project"/>
-        <orderEntry type="library" name="scala-library-2.13.16.jar" level="project"/>
-        <orderEntry type="library" name="scala3-library_3-3.7.4.jar" level="project"/>
-    </component>
+  <component name="NewModuleRootManager">
+    <output url="file://$MODULE_DIR$/../../out/core/internalGenIdea/ideaCompileOutput.dest/classes" />
+    <exclude-output />
+    <content url="file://$MODULE_DIR$/../../core">
+      <sourceFolder url="file://$MODULE_DIR$/../../core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../core/resources" type="java-resource" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" name="scala-SDK-3.7.4" level="project" />
+    <orderEntry type="library" name="cats-core_3-2.13.0.jar" level="project" />
+    <orderEntry type="library" name="cats-free_3-2.13.0.jar" level="project" />
+    <orderEntry type="library" name="cats-kernel_3-2.13.0.jar" level="project" />
+    <orderEntry type="library" name="scala-library-2.13.16.jar" level="project" />
+    <orderEntry type="library" name="scala3-library_3-3.7.4.jar" level="project" />
+    <orderEntry type="library" name="BSP: scala-sdk-3.7.4" level="project" />
+  </component>
 </module>

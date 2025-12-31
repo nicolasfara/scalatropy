@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module external.linked.project.id="file://$MODULE_DIR$/../../mill-synthetic-root-target" external.linked.project.path="$MODULE_DIR$/../.." external.root.project.path="$MODULE_DIR$/../.." external.system.id="BSP" type="JAVA_MODULE" version="4">
-  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_21">
+  <component name="NewModuleRootManager">
     <exclude-output />
     <content url="file://$MODULE_DIR$/../..">
       <excludeFolder url="file://$MODULE_DIR$/../../.bloop" />
@@ -11,7 +11,7 @@
       <excludeFolder url="file://$MODULE_DIR$/../../.settings" />
       <excludeFolder url="file://$MODULE_DIR$/../../out" />
     </content>
-    <orderEntry type="jdk" jdkName="BSP_zulu21.46.19-ca-jdk21.0.9-linux_x64" jdkType="JavaSDK" />
+    <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module-library" scope="TEST">
       <library name="BSP: mill-synthetic-root test dependencies">

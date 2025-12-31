@@ -3,6 +3,7 @@ package it.unibo.pslab
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.peers.Peers.TieTo.*
 import it.unibo.pslab.multiparty.Language.*
+import it.unibo.pslab.peers.Peers.Peer
 
 object MainWorker:
   type Main <: TieToMultiple[Worker]
@@ -11,7 +12,7 @@ object MainWorker:
   private case class Task(x: Int):
     def compute: Int = x * x
 
-  def mainWorkerProgram(using LocalPeer): MultiParty[Unit] = for
+  def mainWorkerProgram[Local <: Peer : LocalPeer]: MultiParty[Unit] = for
     task <- on[Main]:
       for
         peers <- remotes[Worker]

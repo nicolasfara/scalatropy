@@ -5,7 +5,7 @@ import it.unibo.pslab.peers.Peers.TieTo.*
 
 import java.util.UUID
 import scala.util.Random
-import it.unibo.pslab.multiparty.Language.*
+import it.unibo.pslab.multiparty.MultiPartyLanguage.*
 import it.unibo.pslab.peers.Peers.Peer
 
 object IdRequest:

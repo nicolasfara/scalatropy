@@ -2,7 +2,7 @@ package it.unibo.pslab
 
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.peers.Peers.TieTo.TieToSingle
-import it.unibo.pslab.multiparty.Language.*
+import it.unibo.pslab.multiparty.MultiPartyLanguage.*
 import it.unibo.pslab.peers.Peers.Peer
 import it.unibo.pslab.TrianglePingPong.Alice
 

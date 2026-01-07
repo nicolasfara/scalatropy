@@ -87,13 +87,6 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="TEST">
-      <library name="BSP: mill-build/ test dependencies">
-        <CLASSES />
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
     <orderEntry type="library" name="BSP: mill-core-api-daemon_3-1.1.0-RC3" level="project" />
     <orderEntry type="library" name="BSP: mill-core-api_3-1.1.0-RC3" level="project" />
     <orderEntry type="library" name="BSP: mill-core-constants-1.1.0-RC3" level="project" />

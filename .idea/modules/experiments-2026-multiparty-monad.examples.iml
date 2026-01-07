@@ -26,13 +26,6 @@
         <SOURCES />
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="TEST">
-      <library name="BSP: examples test dependencies">
-        <CLASSES />
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
     <orderEntry type="library" name="BSP: scala-library-2.13.16" level="project" />
     <orderEntry type="library" name="BSP: scala3-library_3-3.7.4" level="project" />
   </component>

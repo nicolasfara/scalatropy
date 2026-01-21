@@ -24,9 +24,9 @@ object Peers:
 
   type Peer = { type Tie }
 
-  type TieSingle[P <: Peer] = { type Tie <: Quantifier.Single[P] }
+  type TiedWithSingle[P <: Peer] = { type Tie <: Quantifier.Single[P] }
 
-  type TieMultiple[P <: Peer] = { type Tie <: Quantifier.Multiple[P] }
+  type TiedWithMultiple[P <: Peer] = { type Tie <: Quantifier.Multiple[P] }
 
   type TieTo[P <: Peer] = { type TieTo <: Quantifier[P] }
 

@@ -24,7 +24,7 @@ trait MultiParty[F[_]]:
     PeerTag[From],
     PeerTag[To],
     Label[From]
-  )[V](value: PartialFunction[Remote[To], V], default: V): F[Anisotropic[V] on To]
+  )[V](value: Map[Remote[To], V], default: V): F[Anisotropic[V] on To]
 
   def comm[From <: TiedWithSingle[To], To <: Peer](using PeerTag[From], PeerTag[To])[V](value: V on From): F[V on To]
   def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using PeerTag[From], PeerTag[To])[V](value: V on From): F[V on To]
@@ -63,7 +63,7 @@ object MultiParty:
     PeerTag[From],
     PeerTag[To],
     Label[From]
-  )[F[_]: Monad, V](using lang: MultiParty[F])(value: PartialFunction[lang.Remote[To], V], default: V): F[lang.Anisotropic[V] on To] =
+  )[F[_]: Monad, V](using lang: MultiParty[F])(value: Map[lang.Remote[To], V], default: V): F[lang.Anisotropic[V] on To] =
     lang.anisotropicMessage[From, To](value, default)
 
   def make[F[_]: Monad, P <: Peer: PeerTag](env: Environment[F], network: Network[F, P]): MultiParty[F] = new MultiParty[F]:
@@ -117,9 +117,9 @@ object MultiParty:
       if runtimePeer == from then
         val Placement.Local(res, vMap) = value.runtimeChecked
         for receivers <- network.alivePeersOf[To]
-          _ <- receivers.toList.traverse { r =>
-            val v = vMap(r)
-            network.send(v, res, r)
+          _ <- receivers.toList.traverse { address =>
+            val v = vMap(address)
+            network.send(v, res, address)
           }
         yield Placement.Remote[V, To](res)
       else if runtimePeer == to then
@@ -134,24 +134,13 @@ object MultiParty:
       from: PeerTag[From],
       to: PeerTag[To],
       l: Label[From]
-    )[V](value: PartialFunction[Remote[To], V], default: V): F[Anisotropic[V] on To] =
+    )[V](value: Map[Remote[To], V], default: V): F[Anisotropic[V] on To] =
       val runtimePeer = summon[PeerTag[P]]
       val resourceF = env.provide(from)
       if runtimePeer == from then
-        for receivers <- network.alivePeersOf[To]
-          res <- resourceF
-          _ <- receivers.toList.traverse { address =>
-            val v = value.applyOrElse(address, _ => default)
-            network.send(v, res, address)
-          }
-        yield Placement.Remote[Anisotropic[V], To](res)
-      else if runtimePeer == to then
-        for senders <- network.alivePeersOf[From].map(_.head)
-          res <- resourceF
-          receivedValue <- network.receive[V, From](res, senders)
-        yield Placement.Local[Anisotropic[V], To](res, Map(network.localAddress -> receivedValue))
+        val m = value.map(_.asInstanceOf[Any] -> _).withDefault[V](_ => default)
+        resourceF.map(Placement.Local[Anisotropic[V], To](_, m))
       else resourceF.map(Placement.Remote[Anisotropic[V], To](_))
-      
 
     def reachablePeers[RP <: Peer](using PeerTag[RP])[L <: Peer: Label]: F[Iterable[Remote[RP]]] =
       network.alivePeersOf[RP]

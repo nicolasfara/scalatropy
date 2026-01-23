@@ -50,6 +50,22 @@ object MultiParty:
   def take[Local <: Peer](using Label[Local])[F[_]: Monad, V](placed: V on Local)(using lang: MultiParty[F]): F[V] =
     lang.take[Local](placed)
 
+  def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using PeerTag[From], PeerTag[To])[F[_]: Monad, V](value: V on From)(using lang: MultiParty[F]): F[V on To] =
+    lang.isotropicComm[From, To](value)
+
+  def anisotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
+    PeerTag[From],
+    PeerTag[To]
+  )[F[_]: Monad, V](using lang: MultiParty[F])(value: lang.Anisotropic[V] on From): F[V on To] =
+    lang.anisotropicComm[From, To](value)
+
+  def anisotropicMessage[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
+    PeerTag[From],
+    PeerTag[To],
+    Label[From]
+  )[F[_]: Monad, V](using lang: MultiParty[F])(value: PartialFunction[lang.Remote[To], V], default: V): F[lang.Anisotropic[V] on To] =
+    lang.anisotropicMessage[From, To](value, default)
+
   def make[F[_]: Monad, P <: Peer: PeerTag](env: Environment[F], network: Network[F, P]): MultiParty[F] = new MultiParty[F]:
     type Remote[P <: Peer] = network.Address[P]
     opaque type Anisotropic[V] = Map[Any, V]

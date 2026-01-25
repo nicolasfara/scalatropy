@@ -3,8 +3,8 @@
 
 package build
 
-import mill._
-import scalalib._
+import mill.*
+import scalalib.*
 import com.goyeau.mill.scalafix.ScalafixModule
 import mill.api.Task.Simple
 
@@ -30,6 +30,7 @@ trait CommonScala extends ScalaModule with ScalafixModule {
     "-experimental",
     "-feature",
     "-language:implicitConversions",
+    "-language:experimental.modularity",
     //    "-language:experimental.captureChecking",
     //    "-language:experimental.pureFunctions",
   )
@@ -37,7 +38,7 @@ trait CommonScala extends ScalaModule with ScalafixModule {
   def mvnDeps = Seq(
     mvn"org.typelevel::cats-core:2.13.0",
     mvn"org.typelevel::cats-free:2.13.0",
-    mvn"org.typelevel::cats-effect:3.6.3"
+    mvn"org.typelevel::cats-effect:3.6.3",
   )
 }
 
@@ -52,4 +53,9 @@ object core extends CommonScala {
 
 object examples extends CommonScala {
   def moduleDeps = Seq(core)
+
+  def mvnDeps = Seq(
+    mvn"net.sigusr::fs2-mqtt:1.0.1",
+    mvn"com.lihaoyi::upickle:4.4.2",
+  )
 }

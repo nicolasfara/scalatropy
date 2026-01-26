@@ -10,7 +10,7 @@ import cats.syntax.all.*
 
 import MultiParty.on
 
-trait Label[+V]
+trait Label[+V] extends Erased
 
 trait MultiParty[F[_]]:
   type Remote[P <: Peer]

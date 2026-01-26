@@ -22,14 +22,16 @@ import upickle.ReadWriter
 
 object MqttNetwork:
 
-  case class Address(tag: String, clientId: String) derives ReadWriter
+  case class Address(tag: PeerTag[?], clientId: String) derives ReadWriter
 
-  object Topics:
+  object Configuration:
     val presenceTopic = "pslab/presence"
     val peersBaseTopic = "pslab/peers"
-    val valuesTopic = (tag: String, clientId: String) => s"$peersBaseTopic/$tag/$clientId"
+    val appMsgsTopic = (tag: String, clientId: String) => s"$peersBaseTopic/$tag/$clientId"
+    val keepAliveInterval = 500.millis
+    val aliveTimeout = 10.seconds
 
-  import Topics.*
+  import Configuration.*
 
   type MqttNetwork[F[_], LP <: Peer] = Network[F, LP] { type Format = Array[Byte] }
 
@@ -48,66 +50,66 @@ object MqttNetwork:
   ): Resource[F, MqttNetwork[F, LP]] =
     for
       session <- Session(transportConfig, sessionConfig)
-      incomingMsgs <- Resource.eval(Ref.of(Map.empty[Address, Deferred[F, Array[Byte]]])) // TODO: add Reference
-      activePeers <- Resource.eval(Ref.of(Map.empty[Address, Long]))
-      msgsTopic = valuesTopic(localPeerTag.toString(), clientId)
+      incomingMsgs <- Resource.eval(Ref.of(Map.empty[(Address, Reference), Deferred[F, Array[Byte]]]))
+      activePeers <- Resource.eval(Ref.of(Map.empty[Address, FiniteDuration]))
+      msgsTopic = appMsgsTopic(localPeerTag.toString(), clientId)
       _ <- Resource.eval(session.subscribe(List(msgsTopic, presenceTopic).map((_, AtLeastOnce)).toVector))
       network = MqttNetworkImpl(clientId, session, incomingMsgs, activePeers)
-      _ <- network.publishPresence().background
+      _ <- network.publishPresence.background
       _ <- network.handleIncomingMessage.background
     yield network
 
   private class MqttNetworkImpl[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag as localPeerTag](
       clientId: String,
       session: Session[F],
-      queues: Ref[F, Map[Address, Deferred[F, Array[Byte]]]],
-      activePeers: Ref[F, Map[Address, Long]],
+      peersMessages: Ref[F, Map[(Address, Reference), Deferred[F, Array[Byte]]]],
+      activePeers: Ref[F, Map[Address, FiniteDuration]],
   ) extends Network[F, LP]:
     override type Format = Array[Byte]
 
     override type Address[P <: Peer] = MqttNetwork.Address
 
-    override val localAddress: Address[LP] = Address(localPeerTag.toString(), clientId)
+    override val localAddress: Address[LP] = Address(localPeerTag, clientId)
 
-    val msgsTopic = valuesTopic(localPeerTag.toString(), clientId)
+    val msgsTopic = appMsgsTopic(localPeerTag.toString(), clientId)
 
     private[MqttNetwork] def handleIncomingMessage: F[Unit] = session.messages
       .evalMap:
-        case Message(`presenceTopic`, data) =>
-          for
-            now <- Temporal[F].realTime.map(_.toMillis)
-            peerAddress = upickle.read[Address[?]](data.toArray)
-            _ <- activePeers.update(_.updated(peerAddress, now))
-          yield ()
-        case Message(`msgsTopic`, data) =>
-          for
-            (address, payload) = upickle.read[(Address[?], Array[Byte])](data.toArray)
-            d <- Deferred[F, Array[Byte]]
-            existing <- queues.modify: m =>
-              m.get(address) match
-                case Some(found) => (m - address, found)
-                case None        => (m.updated(address, d), d)
-            _ <- existing.complete(payload)
-          yield ()
-        case _ => Concurrent[F].unit
+        case Message(`presenceTopic`, data) => onKeepAliveMsg(data)
+        case Message(`msgsTopic`, data)     => onApplicationMsg(data)
+        case _                              => Concurrent[F].unit
       .compile
       .drain
 
-    private[MqttNetwork] def publishPresence(interval: FiniteDuration = 500.millis): F[Unit] = (
+    private def onKeepAliveMsg(data: Vector[Byte]): F[Unit] =
+      for
+        now <- Temporal[F].realTime
+        peerAddress = upickle.read[Address[?]](data.toArray)
+        _ <- activePeers.update(_.updated(peerAddress, now))
+      yield ()
+
+    private def onApplicationMsg(data: Vector[Byte]): F[Unit] =
+      for
+        (address, resource, payload) = upickle.read[(Address[?], Reference, Array[Byte])](data.toArray)
+        d <- Deferred[F, Array[Byte]]
+        existing <- takePeerMsgOrDefer((address, resource), d)
+        _ <- existing.complete(payload)
+      yield ()
+
+    private[MqttNetwork] def publishPresence: F[Unit] = (
       session.publish(
         presenceTopic,
         upickle.write(localAddress).getBytes().toVector,
         AtLeastOnce,
-      ) >> Temporal[F].sleep(interval)
+      ) >> Temporal[F].sleep(keepAliveInterval)
     ).foreverM
 
     override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[Iterable[Address[RP]]] =
       for
-        now <- Temporal[F].realTime.map(_.toMillis)
-        peersMap <- activePeers.get
-        res = peersMap.collect:
-          case (addr, lastSeen) if now - lastSeen <= 10_000 && addr.tag == remotePeerTag.toString => addr
-      yield res
+        now <- Temporal[F].realTime
+        peers <- activePeers.get
+      yield peers.collect:
+        case (addr, lastSeen) if now - lastSeen <= aliveTimeout && addr.tag == remotePeerTag => addr
 
     override def send[V: EncodableTo[F, Format], To <: Peer: PeerTag](
         value: V,
@@ -116,8 +118,8 @@ object MqttNetwork:
     ): F[Unit] =
       for
         encodedValue <- encode(value)
-        payload = upickle.write((localAddress, encodedValue)).getBytes().toVector
-        _ <- session.publish(s"pslab/peers/${to.tag}/${to.clientId}", payload, AtLeastOnce)
+        payload = upickle.write((localAddress, resource, encodedValue)).getBytes().toVector
+        _ <- session.publish(appMsgsTopic(to.tag.toString(), to.clientId), payload, AtLeastOnce)
       yield ()
 
     override def receive[V: DecodableFrom[F, Format], From <: Peer: PeerTag](
@@ -126,9 +128,12 @@ object MqttNetwork:
     ): F[V] =
       for
         d <- Deferred[F, Array[Byte]]
-        toWaitOn <- queues.modify: m =>
-          m.get(from) match
-            case Some(found) => (m - from, found)
-            case None        => (m.updated(from, d), d)
+        toWaitOn <- takePeerMsgOrDefer((from, resource), d)
         data <- toWaitOn.get.flatMap(decode)
       yield data
+
+    private def takePeerMsgOrDefer(key: (Address[?], Reference), d: Deferred[F, Array[Byte]]) =
+      peersMessages.modify: m =>
+        m.get(key) match
+          case Some(found) => (m - key, found)
+          case None        => (m.updated(key, d), d)

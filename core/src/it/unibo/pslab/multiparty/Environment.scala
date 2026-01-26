@@ -26,10 +26,9 @@ object Environment:
   private case class ReferenceImpl(id: Int, peerTag: PeerTag[?]) extends Reference
 
   def make[F[_]: Monad]: Environment[F] = new Environment[F]:
-    private var counter = 0
+    // private var counter = 0
     def provide(peerTag: PeerTag[?]): F[Reference] = Monad[F].pure:
-      counter += 1
-      ReferenceImpl(counter, peerTag)
+      ReferenceImpl(0, peerTag)
 
   given ReadWriter[Reference] = readwriter[(Int, PeerTag[?])].bimap[Reference](
     { case ReferenceImpl(id, peerTag) => (id, peerTag) },

@@ -10,6 +10,26 @@
       "args": [],
       "jvmOptions": [],
       "env": {}
+    },
+    {
+      "type": "scala",
+      "request": "launch",
+      "name": "Pinger",
+      "mainClass": "it.unibo.pslab.Pinger",
+      "buildTarget": "file:///Users/tassiluca/Projects/experiments-2026-multiparty-monad/examples",
+      "args": [],
+      "jvmOptions": [],
+      "env": {}
+    },
+    {
+      "type": "scala",
+      "request": "launch",
+      "name": "Ponger",
+      "mainClass": "it.unibo.pslab.Ponger",
+      "buildTarget": "file:///Users/tassiluca/Projects/experiments-2026-multiparty-monad/examples",
+      "args": [],
+      "jvmOptions": [],
+      "env": {}
     }
   ]
 }

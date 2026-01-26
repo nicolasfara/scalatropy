@@ -5,3 +5,5 @@ services:
     ports:
       - "1883:1883" # MQTT
     restart: unless-stopped
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro

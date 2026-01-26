@@ -8,8 +8,8 @@ import it.unibo.pslab.network.Decodable.decode
 import it.unibo.pslab.network.Encodable.encode
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
-import cats.effect.kernel.{ Concurrent, Ref, Resource, Temporal }
-import cats.effect.std.{ Console, Queue }
+import cats.effect.kernel.{ Concurrent, Deferred, Ref, Resource, Temporal }
+import cats.effect.std.Console
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import com.comcast.ip4s.{ Host, Port }
@@ -48,8 +48,8 @@ object MqttNetwork:
   ): Resource[F, MqttNetwork[F, LP]] =
     for
       session <- Session(transportConfig, sessionConfig)
-      incomingMsgs <- Resource.eval(Ref.of[F, Map[Address, Queue[F, Array[Byte]]]](Map.empty)) // TODO: add Reference
-      activePeers <- Resource.eval(Ref[F].of(Map.empty[Address, Long]))
+      incomingMsgs <- Resource.eval(Ref.of(Map.empty[Address, Deferred[F, Array[Byte]]])) // TODO: add Reference
+      activePeers <- Resource.eval(Ref.of(Map.empty[Address, Long]))
       msgsTopic = valuesTopic(localPeerTag.toString(), clientId)
       _ <- Resource.eval(session.subscribe(List(msgsTopic, presenceTopic).map((_, AtLeastOnce)).toVector))
       network = MqttNetworkImpl(clientId, session, incomingMsgs, activePeers)
@@ -60,7 +60,7 @@ object MqttNetwork:
   private class MqttNetworkImpl[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag as localPeerTag](
       clientId: String,
       session: Session[F],
-      queues: Ref[F, Map[Address, Queue[F, Array[Byte]]]],
+      queues: Ref[F, Map[Address, Deferred[F, Array[Byte]]]],
       activePeers: Ref[F, Map[Address, Long]],
   ) extends Network[F, LP]:
     override type Format = Array[Byte]
@@ -82,7 +82,12 @@ object MqttNetwork:
         case Message(`msgsTopic`, data) =>
           for
             (address, payload) = upickle.read[(Address[?], Array[Byte])](data.toArray)
-            _ <- getOrCreate(address).flatMap(_.offer(payload))
+            d <- Deferred[F, Array[Byte]]
+            existing <- queues.modify: m =>
+              m.get(address) match
+                case Some(found) => (m - address, found)
+                case None        => (m.updated(address, d), d)
+            _ <- existing.complete(payload)
           yield ()
         case _ => Concurrent[F].unit
       .compile
@@ -118,13 +123,12 @@ object MqttNetwork:
     override def receive[V: DecodableFrom[F, Format], From <: Peer: PeerTag](
         resource: Reference,
         from: Address[From],
-    ): F[V] = getOrCreate(from).flatMap(_.take).flatMap(decode)
-
-    private def getOrCreate[P <: Peer](address: Address[P]): F[Queue[F, Array[Byte]]] = queues.get.flatMap: m =>
-      m.get(address) match
-        case Some(queue) => queue.pure[F]
-        case None =>
-          for
-            queue <- Queue.bounded[F, Array[Byte]](1)
-            _ <- queues.update(_ + (address -> queue))
-          yield queue
+    ): F[V] =
+      for
+        d <- Deferred[F, Array[Byte]]
+        toWaitOn <- queues.modify: m =>
+          m.get(from) match
+            case Some(found) => (m - from, found)
+            case None        => (m.updated(from, d), d)
+        data <- toWaitOn.get.flatMap(decode)
+      yield data

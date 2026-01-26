@@ -39,6 +39,8 @@ trait CommonScala extends ScalaModule with ScalafixModule {
     mvn"org.typelevel::cats-core:2.13.0",
     mvn"org.typelevel::cats-free:2.13.0",
     mvn"org.typelevel::cats-effect:3.6.3",
+    mvn"net.sigusr::fs2-mqtt:1.0.1",
+    mvn"com.lihaoyi::upickle:4.4.2",
   )
 }
 
@@ -53,9 +55,4 @@ object core extends CommonScala {
 
 object examples extends CommonScala {
   def moduleDeps = Seq(core)
-
-  def mvnDeps = Seq(
-    mvn"net.sigusr::fs2-mqtt:1.0.1",
-    mvn"com.lihaoyi::upickle:4.4.2",
-  )
 }

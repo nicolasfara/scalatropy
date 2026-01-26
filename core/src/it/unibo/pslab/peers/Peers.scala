@@ -1,14 +1,19 @@
 package it.unibo.pslab.peers
 
-import scala.quoted.Quotes
-import scala.quoted.Expr
-import scala.quoted.Type
+import scala.quoted.{ Expr, Quotes, Type }
+
+import upickle.default.{ readwriter, ReadWriter }
 
 object Peers:
 
   sealed trait PeerTag[-P <: Peer]
 
   private case class PeerTagImpl[-P <: Peer](fqn: String) extends PeerTag[P]
+
+  given [P <: Peer] => ReadWriter[PeerTag[P]] = readwriter[String].bimap[PeerTag[P]](
+    { case PeerTagImpl(fqn) => fqn },
+    PeerTagImpl.apply,
+  )
 
   inline given syntesizePeerTag[P <: Peer]: PeerTag[P] = ${ syntesizePeerTagImpl[P] }
 

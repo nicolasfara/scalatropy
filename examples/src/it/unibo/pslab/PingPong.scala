@@ -2,13 +2,10 @@ package it.unibo.pslab
 
 import scala.concurrent.duration.DurationInt
 
-import it.unibo.pslab.PingPong.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
-import it.unibo.pslab.network.Codable
 import it.unibo.pslab.network.mqtt.MqttNetwork
-import it.unibo.pslab.peers.Peers.*
 import it.unibo.pslab.peers.Peers.Quantifier.*
 
 import cats.Monad
@@ -17,22 +14,19 @@ import cats.effect.kernel.Temporal
 import cats.effect.std.Console
 import cats.syntax.all.*
 
+import PingPong.*
+
 object PingPong:
   type Pinger <: { type Tie <: Single[Ponger] }
   type Ponger <: { type Tie <: Single[Pinger] }
 
-  def pingPongProgram[F[_]: {Monad, Console, Temporal}](using
-      lang: MultiParty[F],
-      codable: Codable[F, Int, lang.Format],
-  ): F[Unit] = for
-    initial <- on[Pinger](0.pure)
-    _ <- pingPong(initial)
-  yield ()
+  def pingPongProgram[F[_]: {Monad, Console, Temporal}](using lang: MultiParty[F]): F[Unit] =
+    for
+      initial <- on[Pinger](0.pure)
+      _ <- pingPong(initial)
+    yield ()
 
-  def pingPong[F[_]: {Monad, Console, Temporal}](using
-      lang: MultiParty[F],
-      codable: Codable[F, Int, lang.Format],
-  )(initial: Int on Pinger): F[Unit] =
+  def pingPong[F[_]: {Monad, Console, Temporal}](using lang: MultiParty[F])(initial: Int on Pinger): F[Unit] =
     for
       onPonger <- comm[Pinger, Ponger](initial)
       newCounter <- on[Ponger]:

@@ -44,14 +44,6 @@ object PingPong:
       _ <- pingPong(result)
     yield ()
 
-// @main
-// def main(): Unit =
-//   val env = Environment.make[Id]
-//   val network: Network[Id] = InMemoryNetwork.make[Id]
-//   val lang = MultiParty.project[Id, Multiparty.Pinger](env, network)
-//   val program = Multiparty.pingPongProgram[Id](using summon[Monad[Id]], summon[Console[Id]], lang)
-//   program
-
 object Pinger extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
     .localBroker[IO, PingPong.Pinger]()

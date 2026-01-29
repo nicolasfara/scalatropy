@@ -34,9 +34,3 @@ object Peers:
   type TiedWithMultiple[P <: Peer] = { type Tie <: Quantifier.Multiple[P] }
 
   type TieTo[P <: Peer] = { type TieTo <: Quantifier[P] }
-
-  // sealed trait Peer
-
-  // enum TieTo[P <: Peer] extends Peer:
-  //   case TieToSingle[K <: Peer]() extends TieTo[K]
-  //   case TieToMultiple[K <: Peer]() extends TieTo[K]

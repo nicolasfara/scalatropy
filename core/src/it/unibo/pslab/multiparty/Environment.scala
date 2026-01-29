@@ -8,15 +8,6 @@ import upickle.default as upickle
 
 import upickle.{ ReadWriter, readwriter }
 
-// trait Counter[F[_]]:
-//   def next: F[Int]
-
-// object Counter:
-//   def make[F[_]: Monad]: Counter[[V] =>> StateT[F, Int, V]] = new Counter[[V] =>> StateT[F, Int, V]]:
-//     def next: StateT[F, Int, Int] = StateT { current =>
-//       Monad[F].pure((current + 1, current))
-//     }
-
 trait Environment[F[_]]:
   def provide(peerTag: PeerTag[?]): F[Reference]
 

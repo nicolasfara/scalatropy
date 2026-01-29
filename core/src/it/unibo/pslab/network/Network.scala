@@ -18,5 +18,3 @@ trait Network[F[_], LP <: Peer]:
    *   a [[NonEmptyList]] with all the reachable peers of type [[RP]].
    */
   def alivePeersOf[RP <: Peer: PeerTag]: F[NonEmptyList[Address[RP]]]
-
-  // def receiveAll[V, From <: Peer: PeerTag, To <: Peer: PeerTag](resource: Reference, from: Address[From]): F[Map[Address[To], V]]

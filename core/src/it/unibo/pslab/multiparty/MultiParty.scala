@@ -9,6 +9,7 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 
 import MultiParty.on
+import scala.compiletime.Erased
 
 trait Label[+V] extends Erased
 

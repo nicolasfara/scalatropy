@@ -6,7 +6,7 @@ import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.peers.Peers.Quantifier.*
 
-import cats.Monad
+import cats.{ Monad, MonadThrow }
 import cats.effect.{ IO, IOApp }
 import cats.effect.std.Console
 import cats.syntax.all.*
@@ -21,15 +21,14 @@ object MainWorker:
   case class Task(x: Int) derives ReadWriter:
     def compute: Int = x * x
 
-  def mainWorkerProgram[F[_]: {Monad, Console}](using lang: MultiParty[F]): F[Unit] =
+  def mainWorkerProgram[F[_]: {MonadThrow, Console}](using lang: MultiParty[F]): F[Unit] =
     for
-      task <- on[Main](
+      task <- on[Main]:
         for
           peers <- reachablePeers[Worker]
           allocation = peers.map(_ -> Task(scala.util.Random.nextInt(100))).toList.toMap
           message <- anisotropicMessage[Main, Worker](allocation, Task(0))
-        yield message,
-      )
+        yield message
       taskOnWorker <- anisotropicComm[Main, Worker](task)
       _ <- on[Worker]:
         for

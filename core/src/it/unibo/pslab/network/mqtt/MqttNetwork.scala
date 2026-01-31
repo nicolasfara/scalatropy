@@ -91,10 +91,10 @@ object MqttNetwork:
     private[MqttNetwork] def handleIncomingMessage: F[Unit] =
       session.messages
         .evalMap:
-          case Message(`presenceTopic`, data)                                  => onKeepAliveMsg(data)
-          case Message(`msgsTopic`, data)                                      => onApplicationMsg(data)
-          case Message(`startTopic`, data) if new String(data.toArray) == "go" => started.complete(()).void
-          case _                                                               => Concurrent[F].unit
+          case Message(`presenceTopic`, data)                              => onKeepAliveMsg(data)
+          case Message(`msgsTopic`, data)                                  => onApplicationMsg(data)
+          case Message(`startTopic`, data) if String(data.toArray) == "go" => started.complete(()).void
+          case _                                                           => Concurrent[F].unit
         .compile
         .drain
 

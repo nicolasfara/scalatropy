@@ -4,6 +4,7 @@ import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.mqtt.MqttNetwork
+import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
 import it.unibo.pslab.peers.Peers.Quantifier.*
 
 import cats.{ Monad, MonadThrow }
@@ -39,7 +40,7 @@ object MainWorker:
 
 object MainServer extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, Main]()
+    .localBroker[IO, Main](Configuration(appId = "mainworker"))
     .use: network =>
       val env = Environment.make[IO]
       val lang = MultiParty.make(env, network)
@@ -48,7 +49,7 @@ object MainServer extends IOApp.Simple:
 
 object Worker1 extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, Worker]()
+    .localBroker[IO, Worker](Configuration(appId = "mainworker"))
     .use: network =>
       val env = Environment.make[IO]
       val lang = MultiParty.make(env, network)
@@ -57,7 +58,7 @@ object Worker1 extends IOApp.Simple:
 
 object Worker2 extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, Worker]()
+    .localBroker[IO, Worker](Configuration(appId = "mainworker"))
     .use: network =>
       val env = Environment.make[IO]
       val lang = MultiParty.make(env, network)

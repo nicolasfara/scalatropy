@@ -6,6 +6,7 @@ import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.mqtt.MqttNetwork
+import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
 import it.unibo.pslab.peers.Peers.Quantifier.*
 
 import cats.Monad
@@ -46,7 +47,7 @@ object PingPong:
 
 object Pinger extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, PingPong.Pinger]()
+    .localBroker[IO, PingPong.Pinger](Configuration(appId = "pingpong"))
     .use: network =>
       val env = Environment.make[IO]
       val lang = MultiParty.make(env, network)
@@ -55,7 +56,7 @@ object Pinger extends IOApp.Simple:
 
 object Ponger extends IOApp.Simple:
   override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, PingPong.Ponger]()
+    .localBroker[IO, PingPong.Ponger](Configuration(appId = "pingpong"))
     .use: network =>
       val env = Environment.make[IO]
       val lang = MultiParty.make(env, network)

@@ -1,6 +1,8 @@
 package it.unibo.pslab.network.mqtt
 
-import scala.concurrent.duration.DurationLong
+import java.util.UUID
+
+import scala.concurrent.duration.{ DurationLong, FiniteDuration }
 
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.{ Decodable, Encodable, Network }
@@ -12,58 +14,57 @@ import cats.effect.kernel.{ Concurrent, Deferred, Ref, Resource, Temporal }
 import cats.effect.std.Console
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
-import com.comcast.ip4s.{ Host, Port }
+import com.comcast.ip4s.{ host, port }
 import fs2.io.net.Network as Fs2Network
 import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
 import upickle.ReadWriter
-import java.util.UUID
 
 object MqttNetwork:
 
   case class Address(tag: PeerTag[?], clientId: String) derives ReadWriter
 
-  object Configuration:
-    val startTopic = "pslab/start"
-    val presenceTopic = "pslab/presence"
-    val peersBaseTopic = "pslab/peers"
-    val appMsgsTopic = (tag: String, clientId: String) => s"$peersBaseTopic/$tag/$clientId"
-    val keepAliveInterval = 500.millis
-    val aliveTimeout = 10.seconds
-
-  import Configuration.*
-
-  def localBroker[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag as localPeerTag](
+  case class Configuration(
+      appId: String,
       clientId: String = s"pslab-${UUID.randomUUID()}",
-  ): Resource[F, Network[F, LP]] = make(
-    TransportConfig(Host.fromString("localhost").get, Port.fromInt(1883).get),
-    SessionConfig(clientId, cleanSession = false),
+      initialWaitWindow: FiniteDuration = 5.seconds,
+      keepAliveInterval: FiniteDuration = 250.millis,
   )
 
+  private object Topics:
+    val start = (appId: String) => s"pslab/$appId/start"
+    val presence = (appId: String) => s"pslab/$appId/presence"
+    val inMsgs = (appId: String, tag: PeerTag[?], clientId: String) => s"pslab/$appId/peers/${tag.toString}/$clientId"
+
+  def localBroker[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag](
+      config: Configuration,
+  ): Resource[F, Network[F, LP]] =
+    make(config, TransportConfig(host"localhost", port"1883"), SessionConfig(config.clientId, cleanSession = false))
+
   def make[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag as localPeerTag](
+      networkConfig: Configuration,
       transportConfig: TransportConfig[F],
       sessionConfig: SessionConfig,
   ): Resource[F, Network[F, LP]] =
     for
-      _ <- Resource.eval(F.println(s"=== Peers startup configuration ==="))
+      _ <- Resource.eval(F.println("=== Peers startup configuration ==="))
       session <- Session(transportConfig, sessionConfig)
       incomingMsgs <- Resource.eval(Ref.of(Map.empty[(Address, Reference), Deferred[F, Array[Byte]]]))
       alivePeers <- Resource.eval(Ref.of(Set.empty[Address]))
-      msgsTopic = appMsgsTopic(localPeerTag.toString(), sessionConfig.clientId)
-      _ <- Resource.eval(session.subscribe(List(presenceTopic, startTopic, msgsTopic).map((_, AtLeastOnce)).toVector))
       started <- Resource.eval(Deferred[F, Unit])
-      network = MqttNetworkImpl(sessionConfig.clientId, session, started, incomingMsgs, alivePeers)
+      network = MqttNetworkImpl(networkConfig, session, started, incomingMsgs, alivePeers)
+      _ <- Resource.eval(network.subscribe)
       _ <- network.handleIncomingMessage.background
       _ <- network.publishPresenceUntilStart.background
-      _ <- network.raceForStart.background
+      _ <- network.waitForStart.background
       _ <- Resource.eval(started.get)
-      _ <- Resource.eval(alivePeers.get.flatMap(peers => F.println(s"=== Connected peers: ${peers} ===")))
+      _ <- Resource.eval(alivePeers.get.flatMap(peers => F.println(s"=== Joined peers: ${peers.mkString(",")} ===")))
     yield network
 
   private class MqttNetworkImpl[F[_]: {Concurrent, Temporal, Fs2Network, Console}, LP <: Peer: PeerTag as localPeerTag](
-      clientId: String,
+      networkConfig: Configuration,
       session: Session[F],
       started: Deferred[F, Unit],
       peersMessages: Ref[F, Map[(Address, Reference), Deferred[F, Array[Byte]]]],
@@ -71,42 +72,41 @@ object MqttNetwork:
   ) extends Network[F, LP]:
     override type Address[P <: Peer] = MqttNetwork.Address
 
-    override val localAddress: Address[LP] = Address(localPeerTag, clientId)
+    val startTopic = Topics.start(networkConfig.appId)
+    val presenceTopic = Topics.presence(networkConfig.appId)
+    val inMsgsTopic = Topics.inMsgs(networkConfig.appId, localPeerTag, networkConfig.clientId)
+    val startToken = "start"
 
-    val msgsTopic = appMsgsTopic(localPeerTag.toString(), clientId)
+    override val localAddress: Address[LP] = Address(localPeerTag, networkConfig.clientId)
 
-    private[MqttNetwork] def publishPresenceUntilStart: F[Unit] =
-      val heartbeat = session.publish(
-        presenceTopic,
-        upickle.write(localAddress).getBytes().toVector,
-        AtLeastOnce,
-      ) >> F.sleep(keepAliveInterval)
-      heartbeat.foreverM.race(started.get).void
+    def publishPresenceUntilStart: F[Unit] =
+      val heartbeat = session.publish(presenceTopic, upickle.writeBinary(localAddress), AtLeastOnce)
+      (heartbeat >> F.sleep(networkConfig.keepAliveInterval)).foreverM.race(started.get).void
 
-    private[MqttNetwork] def raceForStart: F[Unit] =
-      val sendGoAfterTimeout = F.sleep(aliveTimeout) >>
-        session.publish(startTopic, "go".getBytes.toVector, AtLeastOnce)
+    def waitForStart: F[Unit] =
+      val sendGoAfterTimeout = F.sleep(networkConfig.initialWaitWindow) >>
+        session.publish(startTopic, upickle.writeBinary(startToken), AtLeastOnce)
       Concurrent[F].race(started.get, sendGoAfterTimeout).void
 
-    private[MqttNetwork] def handleIncomingMessage: F[Unit] =
-      session.messages
-        .evalMap:
-          case Message(`presenceTopic`, data)                              => onKeepAliveMsg(data)
-          case Message(`msgsTopic`, data)                                  => onApplicationMsg(data)
-          case Message(`startTopic`, data) if String(data.toArray) == "go" => started.complete(()).void
-          case _                                                           => Concurrent[F].unit
-        .compile
-        .drain
+    def subscribe: F[Unit] =
+      session.subscribe(List(presenceTopic, startTopic, inMsgsTopic).map((_, AtLeastOnce)).toVector).void
 
-    private def onKeepAliveMsg(data: Vector[Byte]): F[Unit] =
-      for
-        peerAddress = upickle.read[Address[?]](data.toArray)
-        _ <- peers.update(_ + peerAddress)
-      yield ()
+    def handleIncomingMessage: F[Unit] = session.messages
+      .evalMap:
+        case Message(`presenceTopic`, data)                   => onKeepAliveMsg(data)
+        case Message(`inMsgsTopic`, data)                     => onApplicationMsg(data)
+        case Message(`startTopic`, data) if data.isStartToken => started.complete(()).void
+        case _                                                => F.unit
+      .compile
+      .drain
 
-    private def onApplicationMsg(data: Vector[Byte]): F[Unit] =
+    extension (data: Vector[Byte]) def isStartToken: Boolean = upickle.readBinary[String](data.toArray) == startToken
+
+    def onKeepAliveMsg(data: Array[Byte]): F[Unit] = peers.update(_ + upickle.readBinary[Address[?]](data))
+
+    def onApplicationMsg(data: Array[Byte]): F[Unit] =
       for
-        (address, resource, payload) = upickle.read[(Address[?], Reference, Array[Byte])](data.toArray)
+        (address, resource, payload) = upickle.readBinary[(Address[?], Reference, Array[Byte])](data)
         d <- Deferred[F, Array[Byte]]
         existing <- takePeerMsgOrDefer((address, resource), d)
         _ <- existing.complete(payload)
@@ -122,8 +122,8 @@ object MqttNetwork:
     override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: Address[To]): F[Unit] =
       for
         encodedValue <- encode(value)
-        payload = upickle.write((localAddress, resource, encodedValue)).getBytes().toVector
-        _ <- session.publish(appMsgsTopic(to.tag.toString(), to.clientId), payload, AtLeastOnce)
+        payload = upickle.writeBinary((localAddress, resource, encodedValue))
+        _ <- session.publish(Topics.inMsgs(networkConfig.appId, to.tag, to.clientId), payload, AtLeastOnce)
       yield ()
 
     override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: Address[From]): F[V] =
@@ -138,3 +138,6 @@ object MqttNetwork:
         m.get(key) match
           case Some(found) => (m - key, found)
           case None        => (m.updated(key, d), d)
+
+  private given Conversion[Array[Byte], Vector[Byte]] = _.toVector
+  private given Conversion[Vector[Byte], Array[Byte]] = _.toArray

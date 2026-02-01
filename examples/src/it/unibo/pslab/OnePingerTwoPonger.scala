@@ -1,34 +1,79 @@
-// package it.unibo.pslab
+package it.unibo.pslab
 
-// import it.unibo.pslab.multiparty.MultiParty.*
-// import it.unibo.pslab.peers.Peers.TieTo.TieToSingle
-// import it.unibo.pslab.multiparty.MultiPartyLanguage.*
-// import it.unibo.pslab.peers.Peers.Peer
-// import it.unibo.pslab.TrianglePingPong.Alice
+import scala.concurrent.duration.DurationInt
 
-// object TrianglePingPong:
-//   type Alice <: TieToSingle[Bob] & TieToSingle[Andromeda]
-//   type Bob <: TieToSingle[Alice] & TieToSingle[Andromeda]
-//   type Andromeda <: TieToSingle[Bob] & TieToSingle[Alice]
+import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.multiparty.{ Environment, MultiParty }
+import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.network.mqtt.MqttNetwork
+import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
+import it.unibo.pslab.peers.Peers.Quantifier.*
 
-//   def pingPongProgram[Local <: Peer : LocalPeer]: MultiParty[Unit] = for
-//     initial <- on[Alice](0)
-//     _ <- pingPong(initial)
-//   yield ()
+import cats.Monad
+import cats.effect.{ IO, IOApp }
+import cats.effect.kernel.Temporal
+import cats.effect.std.Console
+import cats.syntax.all.*
+import upickle.default.ReadWriter
 
-//   def pingPong[Local <: Peer : LocalPeer](initial: Int on Alice): MultiParty[Unit] = for
-//     aliceSendToBob <- comm[Alice, Bob](initial)
-//     prepareMessageToAndromeda <- on[Bob]:
-//       asLocal(aliceSendToBob).map(_ + 1)
-//     bobSendToAndromeda <- comm[Bob, Andromeda](prepareMessageToAndromeda)
-//     prepareMessageToAlice <- on[Andromeda]:
-//       asLocal(bobSendToAndromeda).map(_ + 1)
-//     pingerSum <- comm[Andromeda, Alice](prepareMessageToAlice)
-//   yield pingPong(pingerSum)
+import TrianglePingPong.*
 
-// @main
-// def mainDoublePonger(): Unit =
-//   println("Multiparty Ping-Pong example defined.")
-//   given LocalPeer[Alice] = new LocalPeer {}
-//   val program = TrianglePingPong.pingPongProgram[Alice]
-//   println(program)
+object TrianglePingPong:
+  type Alice <: { type Tie <: Single[Bob] & Single[Andromeda] }
+  type Bob <: { type Tie <: Single[Alice] & Single[Andromeda] }
+  type Andromeda <: { type Tie <: Single[Bob] & Single[Alice] }
+
+  def pingPongProgram[F[_]: {Monad, Console, Temporal}](using lang: MultiParty[F]): F[Unit] = for
+    initial <- on[Alice](0.pure)
+    _ <- pingPong(initial)
+  yield ()
+
+  def pingPong[F[_]: {Monad, Console, Temporal}](initial: Int on Alice)(using lang: MultiParty[F]): F[Unit] = for
+    _ <- on[Alice]:
+      for
+        v <- take(initial)
+        _ <- F.println(s"Alice's value: $v")
+      yield ()
+    aliceSendToBob <- comm[Alice, Bob](initial)
+    prepareMessageToAndromeda <- on[Bob]:
+      for
+        v <- take(aliceSendToBob)
+        _ <- F.println(s"Bob's value: $v")
+      yield v + 1
+    bobSendToAndromeda <- comm[Bob, Andromeda](prepareMessageToAndromeda)
+    prepareMessageToAlice <- on[Andromeda]:
+      for
+        v <- take(bobSendToAndromeda)
+        _ <- F.println(s"Andromeda's value: $v")
+      yield v + 1
+    pingerSum <- comm[Andromeda, Alice](prepareMessageToAlice)
+    _ <- F.sleep(1.second)
+    _ <- pingPong(pingerSum)
+  yield ()
+
+object Bob extends IOApp.Simple:
+  override def run: IO[Unit] = MqttNetwork
+    .localBroker[IO, TrianglePingPong.Bob](Configuration(appId = "triangle-pingpong"))
+    .use: network =>
+      val env = Environment.make[IO]
+      val lang = MultiParty.make(env, network)
+      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
+      program
+
+object Andromeda extends IOApp.Simple:
+  override def run: IO[Unit] = MqttNetwork
+    .localBroker[IO, TrianglePingPong.Andromeda](Configuration(appId = "triangle-pingpong"))
+    .use: network =>
+      val env = Environment.make[IO]
+      val lang = MultiParty.make(env, network)
+      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
+      program
+
+object Alice extends IOApp.Simple:
+  override def run: IO[Unit] = MqttNetwork
+    .localBroker[IO, TrianglePingPong.Alice](Configuration(appId = "triangle-pingpong"))
+    .use: network =>
+      val env = Environment.make[IO]
+      val lang = MultiParty.make(env, network)
+      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
+      program

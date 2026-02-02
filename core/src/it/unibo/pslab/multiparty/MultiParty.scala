@@ -121,7 +121,7 @@ object MultiParty:
       env: Environment[F],
       network: Network[F, P],
   ): MultiParty[F] = new MultiParty[F]:
-    type Remote[P <: Peer] = network.Address[P]
+    opaque type Remote[P <: Peer] = network.Address[P]
     opaque type Anisotropic[V] = Map[Any, V]
 
     def on[Local <: Peer](using local: PeerTag[Local])[V](body: Label[Local] ?=> F[V]): F[V on Local] =
@@ -141,14 +141,14 @@ object MultiParty:
         for
           receiver <- network.alivePeersOf[To].map(_.head)
           _ <- network.send(v, res, receiver)
-        yield Placement.Remote[V, To](res)
+        yield Placement.Remote(res)
       else if runtimePeer == to then
         val Placement.Remote(res) = value.runtimeChecked
         for
           sender <- network.alivePeersOf[From].map(_.head)
           value <- network.receive(res, sender)
-        yield Placement.Local[V, To](res, value)
-      else Placement.Remote[V, To](value.res).pure[F]
+        yield Placement.Local(res, value)
+      else Placement.Remote(value.res).pure
 
     def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
         from: PeerTag[From],
@@ -160,14 +160,14 @@ object MultiParty:
         for
           receivers <- network.alivePeersOf[To]
           _ <- receivers.toList.traverse(network.send(v, res, _))
-        yield Placement.Remote[V, To](res)
+        yield Placement.Remote(res)
       else if runtimePeer == to then
         val Placement.Remote(res) = value.runtimeChecked
         for
-          senders <- network.alivePeersOf[From]
-          value <- senders.toList.traverse(network.receive[V, From](res, _)).map(_.head)
-        yield Placement.Local[V, To](res, value)
-      else Placement.Remote[V, To](value.res).pure[F]
+          sender <- network.alivePeersOf[From].map(_.head)
+          value <- network.receive(res, sender)
+        yield Placement.Local(res, value)
+      else Placement.Remote(value.res).pure
 
     def anisotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
         from: PeerTag[From],
@@ -181,14 +181,14 @@ object MultiParty:
           _ <- receivers.toList.traverse: address =>
             val v = vMap(address)
             network.send(v, res, address)
-        yield Placement.Remote[V, To](res)
+        yield Placement.Remote(res)
       else if runtimePeer == to then
         val Placement.Remote(res) = value.runtimeChecked
         for
-          senders <- network.alivePeersOf[From]
-          value <- senders.toList.traverse(network.receive[V, From](res, _)).map(_.head)
-        yield Placement.Local[V, To](res, value)
-      else Placement.Remote[V, To](value.res).pure[F]
+          sender <- network.alivePeersOf[From].map(_.head)
+          value <- network.receive(res, sender)
+        yield Placement.Local(res, value)
+      else Placement.Remote(value.res).pure
 
     def anisotropicMessage[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
         from: PeerTag[From],
@@ -210,22 +210,23 @@ object MultiParty:
           receiver <- network.alivePeersOf[To].map(_.head)
           _ <- network.send(v, res, receiver)
         yield Placement.Remote(res)
-      else
+      else if runtimePeer == to then
         val Placement.Remote(res) = value.runtimeChecked
         for
           senders <- network.alivePeersOf[From]
-          values <- senders.toList.traverse(s => network.receive[V, From](res, s).map(s -> _))
+          values <- senders.toList.traverse(s => network.receive(res, s).map(s -> _))
         yield Placement.Local(res, values.toMap)
+      else Placement.Remote(value.res).pure
 
     def reachablePeers[RP <: Peer](using PeerTag[RP])[L <: Peer: Label]: F[NonEmptyList[Remote[RP]]] =
       network.alivePeersOf[RP]
 
     def take[Local <: Peer](using Label[Local])[V](placed: V on Local): F[V] =
       val Placement.Local(res, v) = placed.runtimeChecked
-      v.pure[F]
+      v.pure
 
     def takeAll[Local <: Peer](using
         Label[Local],
     )[V](placed: Anisotropic[V] on Local): F[Map[Remote[Peer], V]] =
       val Placement.Local(res, vMap) = placed.runtimeChecked
-      vMap.asInstanceOf[Map[Remote[Peer], V]].pure[F]
+      vMap.asInstanceOf[Map[Remote[Peer], V]].pure

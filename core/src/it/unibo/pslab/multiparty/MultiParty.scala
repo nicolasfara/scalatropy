@@ -121,7 +121,7 @@ object MultiParty:
       env: Environment[F],
       network: Network[F, P],
   ): MultiParty[F] = new MultiParty[F]:
-    opaque type Remote[P <: Peer] = network.Address[P]
+    type Remote[P <: Peer] = network.Address[P]
     opaque type Anisotropic[V] = Map[Any, V]
 
     def on[Local <: Peer](using local: PeerTag[Local])[V](body: Label[Local] ?=> F[V]): F[V on Local] =

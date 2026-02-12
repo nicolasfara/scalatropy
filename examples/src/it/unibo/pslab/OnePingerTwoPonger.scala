@@ -3,7 +3,7 @@ package it.unibo.pslab
 import scala.concurrent.duration.DurationInt
 
 import it.unibo.pslab.UpickleCodable.given
-import it.unibo.pslab.multiparty.{ Environment, MultiParty }
+import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
@@ -52,28 +52,16 @@ object TrianglePingPong:
   yield ()
 
 object Bob extends IOApp.Simple:
-  override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, TrianglePingPong.Bob](Configuration(appId = "triangle-pingpong"))
-    .use: network =>
-      val env = Environment.make[IO]
-      val lang = MultiParty.make(env, network)
-      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
-      program
+  override def run: IO[Unit] =
+    val mqttNetwork = MqttNetwork.localBroker[IO, Bob](Configuration(appId = "triangle-pingpong"))
+    ScalaTropy(pingPongProgram[IO]).projectedOn[Bob](using mqttNetwork)
 
 object Andromeda extends IOApp.Simple:
-  override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, TrianglePingPong.Andromeda](Configuration(appId = "triangle-pingpong"))
-    .use: network =>
-      val env = Environment.make[IO]
-      val lang = MultiParty.make(env, network)
-      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
-      program
+  override def run: IO[Unit] =
+    val mqttNetwork = MqttNetwork.localBroker[IO, Andromeda](Configuration(appId = "triangle-pingpong"))
+    ScalaTropy(pingPongProgram[IO]).projectedOn[Andromeda](using mqttNetwork)
 
 object Alice extends IOApp.Simple:
-  override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, TrianglePingPong.Alice](Configuration(appId = "triangle-pingpong"))
-    .use: network =>
-      val env = Environment.make[IO]
-      val lang = MultiParty.make(env, network)
-      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
-      program
+  override def run: IO[Unit] =
+    val mqttNetwork = MqttNetwork.localBroker[IO, Alice](Configuration(appId = "triangle-pingpong"))
+    ScalaTropy(pingPongProgram[IO]).projectedOn[Alice](using mqttNetwork)

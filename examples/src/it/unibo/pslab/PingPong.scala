@@ -3,7 +3,7 @@ package it.unibo.pslab
 import scala.concurrent.duration.DurationInt
 
 import it.unibo.pslab.UpickleCodable.given
-import it.unibo.pslab.multiparty.{ Environment, MultiParty }
+import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
@@ -46,19 +46,11 @@ object PingPong:
     yield ()
 
 object Pinger extends IOApp.Simple:
-  override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, PingPong.Pinger](Configuration(appId = "pingpong"))
-    .use: network =>
-      val env = Environment.make[IO]
-      val lang = MultiParty.make(env, network)
-      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
-      program
+  override def run: IO[Unit] =
+    val mqttNetwork = MqttNetwork.localBroker[IO, Pinger](Configuration(appId = "pingpong"))
+    ScalaTropy(pingPongProgram[IO]).projectedOn[Pinger](using mqttNetwork)
 
 object Ponger extends IOApp.Simple:
-  override def run: IO[Unit] = MqttNetwork
-    .localBroker[IO, PingPong.Ponger](Configuration(appId = "pingpong"))
-    .use: network =>
-      val env = Environment.make[IO]
-      val lang = MultiParty.make(env, network)
-      val program = pingPongProgram[IO](using summon[Monad[IO]], summon[Console[IO]], summon[Temporal[IO]], lang)
-      program
+  override def run: IO[Unit] =
+    val mqttNetwork = MqttNetwork.localBroker[IO, Ponger](Configuration(appId = "pingpong"))
+    ScalaTropy(pingPongProgram[IO]).projectedOn[Ponger](using mqttNetwork)

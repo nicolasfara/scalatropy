@@ -21,7 +21,7 @@ trait CommonScala extends ScalaModule with ScalafixModule {
     "-indent",
     "-unchecked",
     "-explain",
-    "-Xcheck-macros",
+    // "-Xcheck-macros",
     "-Wunused:imports",
     //    "-source:3.8",
     //    "-Xprint:cc",

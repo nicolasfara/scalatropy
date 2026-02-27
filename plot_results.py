@@ -195,9 +195,7 @@ def main() -> None:
     print(f"✓ Figure saved: {output_path}")
     print(f"  Resolution: {config.dpi} DPI")
     print(f"  Size: {config.figure_size[0]}\" × {config.figure_size[1]}\"")
-    # Display figure
-    plt.show()
-
+    plt.close(fig)
 
 if __name__ == "__main__":
     main()

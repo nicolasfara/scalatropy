@@ -10,12 +10,13 @@ import it.unibo.pslab.network.{ Decodable, Encodable, Network, NetworkMonitor }
 import it.unibo.pslab.network.Codable.{ decode, encode }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
-import cats.data.NonEmptyList
+import cats.data.{ NonEmptyList, OptionT }
 import cats.effect.kernel.{ Concurrent, Deferred, Ref, Resource, Temporal }
-import cats.effect.std.Console
+import cats.effect.std.{ Console, Env }
 import cats.effect.syntax.all.*
+import cats.effect.implicits.parallelForGenSpawn
 import cats.syntax.all.*
-import com.comcast.ip4s.{ host, port }
+import com.comcast.ip4s.{ host, port, Host, Port }
 import fs2.io.net.Network as Fs2Network
 import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
@@ -40,8 +41,22 @@ object MqttNetwork:
     val inMsgs = (appId: String, tag: PeerTag[?], clientId: String) => s"pslab/$appId/peers/${tag.toString}/$clientId"
 
   sealed trait NetworkError extends NoStackTrace
+  case class InvalidConfiguration(message: String) extends NetworkError
   case class NoSuchPeers(tag: PeerTag[?]) extends NetworkError:
     override def getMessage: String = s"No alive peers of type $tag found"
+
+  def fromEnv[F[_]: {Concurrent, Env, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag](
+      config: Configuration,
+  ): Resource[F, Network[F, LP]] =
+    def env[A](name: String, parse: String => Option[A]): F[A] =
+      OptionT(F.get(name))
+        .subflatMap(parse)
+        .getOrElseF(Concurrent[F].raiseError(InvalidConfiguration(s"Env $name is required and must be valid")))
+    for
+      (host, port) <- Resource.eval:
+        (env("MQTT_BROKER_HOST", Host.fromString), env("MQTT_BROKER_PORT", Port.fromString)).parTupled
+      network <- make(config, TransportConfig(host, port), SessionConfig(config.clientId, cleanSession = true))
+    yield network
 
   def localBroker[F[_]: {Concurrent, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag](
       config: Configuration,

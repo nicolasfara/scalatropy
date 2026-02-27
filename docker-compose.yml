@@ -1,9 +1,30 @@
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0
-    container_name: mosquitto
+    container_name: mosquitto-broker
     ports:
       - "1883:1883" # MQTT
     restart: unless-stopped
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - experiment-net
+
+  evaluation:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: evaluation
+    depends_on:
+      - mosquitto
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - MQTT_BROKER_PORT=1883
+    volumes:
+      - ./evaluation:/app/evaluation
+    networks:
+      - experiment-net
+
+networks:
+  experiment-net:
+    driver: bridge

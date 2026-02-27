@@ -85,7 +85,7 @@ object MatMulMasterWorker:
 trait MatMulMqttConfig:
   val mqttConfig = Configuration(
     appId = "broadcast-matmul-master-worker",
-    initialWaitWindow = 10.seconds,
+    initialWaitWindow = 20.seconds,
   )
 
 object MatMulMaster extends IOApp with MatMulMqttConfig:
@@ -93,7 +93,7 @@ object MatMulMaster extends IOApp with MatMulMqttConfig:
     args.headOption match
       case Some(label) =>
         withCsvMonitoring(s"evaluation/selective-experiment-$label.csv"):
-          val mqttNetwork = MqttNetwork.localBroker[IO, Master](mqttConfig)
+          val mqttNetwork = MqttNetwork.fromEnv[IO, Master](mqttConfig)
           ScalaTropy(matmul[IO]).projectedOn[Master](using mqttNetwork).as(ExitCode.Success)
       case None => IO.println("Usage: MatMulMaster <label>").as(ExitCode.Error)
 
@@ -101,6 +101,6 @@ object MatMulWorker extends IOApp with MatMulMqttConfig:
   override def run(args: List[String]): IO[ExitCode] =
     args.headOption match
       case Some(workerId) =>
-        val mqttNetwork = MqttNetwork.localBroker[IO, Worker](mqttConfig)
+        val mqttNetwork = MqttNetwork.fromEnv[IO, Worker](mqttConfig)
         ScalaTropy(matmul[IO]).projectedOn[Worker](using mqttNetwork).as(ExitCode.Success)
       case None => IO.println("Usage: MatMulWorker <workerId>").as(ExitCode.Error)

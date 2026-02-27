@@ -1,0 +1,24 @@
+# Build outputs
+out/
+.bsp/
+.metals/
+.bloop/
+
+# Python virtual environment (will be created in container)
+venv/
+
+# Git
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Evaluation results
+evaluation/

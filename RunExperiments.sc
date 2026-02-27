@@ -1,12 +1,14 @@
-#!/usr/bin/env scala
+#!/usr/bin/env -S scala-cli shebang --scala-version 3.8.1
 
 import java.io.File
 import java.nio.file.Path
-import scala.sys.process.*
 import java.nio.file.{ Files, Paths, StandardCopyOption }
 import java.util.Comparator.reverseOrder
-import scala.concurrent.duration.*
+import scala.sys.process.*
 import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration.*
+import scala.concurrent.{ Future, Await, ExecutionContext, TimeoutException }
+import ExecutionContext.Implicits.global
 
 object ExperimentRunner:
 
@@ -14,6 +16,7 @@ object ExperimentRunner:
   private val evaluationDirectory = Paths.get("evaluation")
   private val classpath = "out/examples/assembly.dest/out.jar"
   private val maxWorkers = 32
+  private val experimentTimeout = 50.seconds
 
   def main(args: Array[String]): Unit =
     prepare()
@@ -21,12 +24,15 @@ object ExperimentRunner:
     runExperimentsUsingBroadcastComm(maxWorkers)
     runExperimentsUsingSelectiveComm(maxWorkers)
     plot()
+    log(s"All done! Generated plots are available at ${evaluationDirectory.toAbsolutePath()}")
 
   def prepare(): Unit =
     mkdir(evaluationDirectory)
     cleanup(evaluationDirectory)
 
-  def compile(): Unit = "./mill examples.assembly".!
+  def compile(): Unit =
+    val exitCode = "./mill examples.assembly".!
+    if exitCode != 0 then throw new RuntimeException(s"Compilation failed with exit code $exitCode")
 
   def runExperimentsUsingSelectiveComm(maxWorkers: Int): Unit =
     log("Running MatMul Master-Worker program with selective style communications")
@@ -54,13 +60,24 @@ object ExperimentRunner:
         log(s"Starting $label with $workers worker(s)")
         val masterProcess = process(masterClass, s"$workers-workers").run()
         val workerProcesses = (1 to workers).map(i => process(workerClass, i.toString).run())
-        val exitCode = masterProcess.exitValue()
-        Thread.sleep(2_000)
+        val exitCodeFuture = Future(masterProcess.exitValue())
+        try
+          val exitCode = Await.result(exitCodeFuture, experimentTimeout)
+          if exitCode != 0 then
+            throw new RuntimeException(s"$label with $workers worker(s) failed with exit code $exitCode")
+        catch
+          case _: TimeoutException =>
+            masterProcess.destroy()
+            workerProcesses.foreach(_.destroy())
+            throw new RuntimeException(
+              s"$label with $workers worker(s) timed out. Probably you've run out of resources and your setup is not able to run ${workers} workers in parallel",
+            )
 
   def plot(): Unit =
     log("Plotting results")
     ensurePythonEnvironment()
-    Process(Seq(pythonExecutable, "plot_results.py")).!
+    val exitCode = Process(Seq(pythonExecutable, "plot_results.py")).!
+    if exitCode != 0 then throw new RuntimeException(s"Plotting failed with exit code $exitCode")
 
   def ensurePythonEnvironment(): Unit =
     if !venvExists then

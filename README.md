@@ -35,7 +35,7 @@ you need to replace `<MAIN_PROGRAM_FQN>` with the fully qualified name of the ma
 > [!NOTE]
 > Once started, each node will wait some seconds (by default, 7 seconds) to allow the discovery of all the other parties. Once the discovery phase is completed, the execution of the choreography will start and you will see the output of each node in the console.
 
-You can configure the initial waiting window by adjusting like this:
+You can configure the initial waiting window by adjusting it like below:
 
 ```scala
 val mqttConfig = Configuration(appId = "my-app-id", initialWaitWindow = 15.seconds)
@@ -43,16 +43,15 @@ val mqttConfig = Configuration(appId = "my-app-id", initialWaitWindow = 15.secon
 
 ## Evaluation experiments reproduction
 
-The Message Overhead Analysis can be reproduced by running the `RunExperiments.sc` script provided in the root of the repository.
+The Message Overhead Analysis is reproducible by running:
 
 ```bash
-./RunExperiments.sc
+docker compose up evaluation
 ```
-
-The only prerequisite is to have Python 3.
 
 This will run the experiments for both the broadcasting and selective communication strategies, and will plot the results using the `plot_results.py` script, saving the resulting figure in the `evaluation/` directory together with the raw data.
 
 The whole experiments take approximately 3 minutes.
 
-Keep in mind that these experiments involve up to 32 concurrent IOApp instances — a machine with a bit of headroom to spare will go a long way here.
+> [!NOTE]
+> Keep in mind that these experiments involve up to 32 concurrent `IOApp` instances — a machine with a bit of headroom to spare will go a long way here.

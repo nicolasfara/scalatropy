@@ -20,6 +20,15 @@ else
     exit 1
 fi
 
+# --- Docker Compose Check (Mandatory) ---
+if command_exists docker-compose || (command_exists docker && docker compose version >/dev/null 2>&1); then
+    echo -e "${GREEN}Docker Compose is installed.${NC}"
+else
+    echo -e "${RED}Error: Docker Compose is not installed. Please install it to continue.${NC}"
+    echo "Installation instructions: https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
 # --- Scala 3 Check (Optional) ---
 if command_exists scala3; then
     echo -e "${GREEN}Scala 3 is installed (found as scala3).${NC}"

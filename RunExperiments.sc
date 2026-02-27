@@ -69,9 +69,10 @@ object ExperimentRunner:
           case _: TimeoutException =>
             masterProcess.destroy()
             workerProcesses.foreach(_.destroy())
-            throw new RuntimeException(
-              s"$label with $workers worker(s) timed out. Probably you've run out of resources and your setup is not able to run ${workers} workers in parallel",
-            )
+            throw new RuntimeException(s"""
+              | $label with $workers worker(s) timed out. 
+              | Probably you've run out of resources and your setup is not able to run ${workers} workers in parallel
+             """.stripMargin)
 
   def plot(): Unit =
     log("Plotting results")

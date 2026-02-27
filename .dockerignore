@@ -3,12 +3,14 @@ out/
 .bsp/
 .metals/
 .bloop/
+.scala-build/
 
-# Python virtual environment (will be created in container)
+# Python virtual environment
 venv/
 
 # Git
 .git/
+.gitignore
 
 # IDE
 .idea/

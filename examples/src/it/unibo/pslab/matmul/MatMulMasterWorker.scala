@@ -85,6 +85,7 @@ object MatMulMasterWorker:
 trait MatMulMqttConfig:
   val mqttConfig = Configuration(
     appId = "broadcast-matmul-master-worker",
+    // give plenty of time to avoid experiments with many (blocking) workers do not connect in time
     initialWaitWindow = 20.seconds,
   )
 

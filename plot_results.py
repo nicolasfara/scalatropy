@@ -1,6 +1,10 @@
 from pathlib import Path
 from typing import Dict, Tuple, Set
 from dataclasses import dataclass
+from matplotlib.figure import Figure
+from matplotlib.axes import Axes
+from matplotlib.ticker import FuncFormatter
+from matplotlib.container import BarContainer
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -99,10 +103,22 @@ def create_plot(
     selective_results: Dict[int, float],
     broadcasting_results: Dict[int, float],
     config: AnalysisConfig
-) -> plt.Figure:
+) -> Figure:
     """
     Create the side-by-side bar chart comparing selective vs broadcasting approaches.
     """
+    def add_bar_labels(ax: Axes, bars: BarContainer, fontsize: int = 8) -> None:
+        for bar in bars.patches:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height,
+                    f'{height:,.2f}',
+                    ha='center',
+                    va='bottom',
+                    fontsize=fontsize,
+                )
     # Prepare data
     workers = sorted(set(selective_results.keys()) | set(broadcasting_results.keys()))
     selective_values = [selective_results.get(w, 0) for w in workers]
@@ -134,38 +150,35 @@ def create_plot(
         alpha=0.9
     )
     # Add value labels on bars
-    _add_bar_labels(ax, bars_selective, fontsize=8)
-    _add_bar_labels(ax, bars_broadcasting, fontsize=8)
+    add_bar_labels(ax, bars_selective, fontsize=8)
+    add_bar_labels(ax, bars_broadcasting, fontsize=8)
     # Configure axes
     ax.set_xlabel('Number of Workers', fontweight='normal')
     ax.set_ylabel('Data sent by the Master (KB)', fontweight='normal')
     # X-axis ticks
     ax.set_xticks(x_positions)
-    ax.set_xticklabels(workers)
+    ax.set_xticklabels([str(w) for w in workers])
     # Legend
     ax.legend(loc='upper left', framealpha=0.95)
     # Grid
     ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.5)
     ax.set_axisbelow(True)
     # Y-axis formatting
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:,.2f}'))
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f'{x:,.2f}'))
     # Tight layout
     plt.tight_layout()
     return fig
-
-
-def _add_bar_labels(ax: plt.Axes, bars, fontsize: int = 8) -> None:
-    for bar in bars:
-        height = bar.get_height()
-        if height > 0:
-            ax.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height,
-                f'{height:,.2f}',
-                ha='center',
-                va='bottom',
-                fontsize=fontsize,
-            )
+            
+def log_results(selective: Dict[int, float], broadcasting: Dict[int, float]) -> None:
+    """
+    Print experimental results in tabular format.
+    """
+    workers = sorted(set(selective.keys()) | set(broadcasting.keys()))
+    print(f"\n{'Workers':<10} {'Selective (KB)':<20} {'Broadcasting (KB)':<20}")
+    print("-" * 65)
+    for w in workers:
+        sel, bcast = selective.get(w, 0), broadcasting.get(w, 0)
+        print(f"{w:<10} {sel:<20,.2f} {bcast:<20,.2f}")
 
 def main() -> None:
     config = AnalysisConfig()
@@ -193,9 +206,10 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=config.dpi, bbox_inches='tight')
     print(f"✓ Figure saved: {output_path}")
-    print(f"  Resolution: {config.dpi} DPI")
-    print(f"  Size: {config.figure_size[0]}\" × {config.figure_size[1]}\"")
     plt.close(fig)
+    # Print results in tabular format
+    print(f"✓ Experimental results:")
+    log_results(selective_results, broadcasting_results)
 
 if __name__ == "__main__":
     main()

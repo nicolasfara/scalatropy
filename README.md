@@ -15,10 +15,10 @@ Examples are provided in the `examples/` directory and use an MQTT-based network
 To run the examples, use the Docker Compose file provided in the root of the repository:
 
 ```bash
-docker compose up
+docker compose up mosquitto
 ```
 
-This will expose an MQTT broker on port `1883`.
+This will expose an MQTT broker at `localhost` on port `1883`.
 
 You can then run the main methods provided in each example either by using your IDE or by following these steps:
 
@@ -52,6 +52,3 @@ docker compose up evaluation
 This will run the experiments for both the broadcasting and selective communication strategies, and will plot the results using the `plot_results.py` script, saving the resulting figure in the `evaluation/` directory together with the raw data.
 
 The whole experiments take approximately 3 minutes.
-
-> [!NOTE]
-> Keep in mind that these experiments involve up to 32 concurrent `IOApp` instances — a machine with a bit of headroom to spare will go a long way here.

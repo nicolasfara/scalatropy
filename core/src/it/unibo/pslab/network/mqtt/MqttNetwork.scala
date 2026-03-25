@@ -22,6 +22,10 @@ import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
 import upickle.ReadWriter
+import it.unibo.pslab.network.CommunicationProtocol
+
+trait MqttNetwork extends CommunicationProtocol:
+  override val tag: Tag = "MqttNetwork"
 
 object MqttNetwork:
 
@@ -88,7 +92,8 @@ object MqttNetwork:
       started: Deferred[F, Unit],
       peers: Ref[F, Set[Address]],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
-  ) extends BaseNetwork[F, LP, Address]:
+  ) extends BaseNetwork[F, LP, Address]
+      with MqttNetwork:
     override type Address[P <: Peer] = MqttNetwork.Address
 
     val startTopic = Topics.start(networkConfig.appId)

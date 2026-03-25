@@ -9,6 +9,10 @@ import cats.data.NonEmptyList
 import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
+import it.unibo.pslab.network.CommunicationProtocol
+
+trait InMemoryNetwork extends CommunicationProtocol:
+  override val tag: Tag = "InMemoryNetwork"
 
 object InMemoryNetwork:
 
@@ -60,15 +64,9 @@ object InMemoryNetwork:
       knownPeers: NonEmptyList[Address],
       messagesDispatcher: MessagesDispatcher[F],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
-  ) extends BaseNetwork[F, LP, Address]:
+  ) extends BaseNetwork[F, LP, Address]
+      with InMemoryNetwork:
     override type Address[P <: Peer] = InMemoryNetwork.Address
-
-    def asHandle: NetworkHandle[F] = new NetworkHandle[F]:
-      override def deliver(payload: Array[Byte], resource: Reference, from: InMemoryNetwork.Address): F[Unit] =
-        for
-          existing <- takePeerMsgOrDefer((from, resource))
-          _ <- existing.complete(payload)
-        yield ()
 
     override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[Address[RP]]] =
       val filtered = knownPeers.toList.filter(_.tag == remotePeerTag)
@@ -84,3 +82,10 @@ object InMemoryNetwork:
 
     override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: Address[From]): F[V] =
       receiveImpl(resource, from)
+
+    def asHandle: NetworkHandle[F] = new NetworkHandle[F]:
+      override def deliver(payload: Array[Byte], resource: Reference, from: InMemoryNetwork.Address): F[Unit] =
+        for
+          existing <- takePeerMsgOrDefer((from, resource))
+          _ <- existing.complete(payload)
+        yield ()

@@ -4,7 +4,12 @@ import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 import cats.data.NonEmptyList
 
-trait Network[F[_], LP <: Peer]:
+trait CommunicationProtocol:
+  type Tag = String
+
+  val tag: Tag
+
+trait Network[F[_], LP <: Peer] extends CommunicationProtocol:
   type Address[P <: Peer]
 
   val localAddress: Address[LP]

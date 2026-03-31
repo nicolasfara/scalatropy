@@ -33,8 +33,7 @@ object ExperimentRunner:
     info("Running MatMul Master-Worker program with selective style communications")
     runExperiments(
       maxWorkers,
-      masterClass = s"$basePackage.matmul.MatMulMaster",
-      workerClass = s"$basePackage.matmul.MatMulWorker",
+      fqClass = s"$basePackage.matmul.MatMulMaster",
       label = "selective experiment",
     )
 
@@ -42,16 +41,15 @@ object ExperimentRunner:
     info("Running MatMul Master-Worker program with broadcasting style communications")
     runExperiments(
       maxWorkers,
-      masterClass = s"$basePackage.matmul.InefficientMatMulMaster",
-      workerClass = s"$basePackage.matmul.InefficientMatMulWorker",
+      fqClass = s"$basePackage.matmul.InefficientMatMulMaster",
       label = "broadcasting (inefficient) experiment",
     )
 
-  def runExperiments(maxWorkers: Int, masterClass: String, workerClass: String, label: String): Unit =
+  def runExperiments(maxWorkers: Int, fqClass: String, label: String): Unit =
     var workers = 1
     while workers <= maxWorkers do
       info(s"Starting $label with $workers worker(s)")
-      val exitCode = runScalaMain(masterClass, workers.toString, s"$workers-workers").!
+      val exitCode = runScalaMain(fqClass, workers.toString, s"$workers-workers").!
       if exitCode != 0 then
         removeMatching(evaluationDirectory, s".*${workers}(-workers)?\\.csv")
         throw RuntimeException(
@@ -95,18 +93,12 @@ object ExperimentRunner:
   def runScalaMain(fqn: String, args: String*): ProcessBuilder =
     Process(Seq("./mill", "examples.runMain", fqn) ++ args)
 
-  def move(source: Path, target: Path): Unit = Files.move(source, target)
-
   def removeMatching(directory: Path, pattern: String): Unit =
     Files.list(directory).filter(p => p.getFileName.toString.matches(pattern)).forEach(Files.delete)
 
   def currentPath: Path = Paths.get(".").toAbsolutePath.normalize()
 
-  def env(variableName: String): Option[String] = Option(System.getenv(variableName))
-
   def info(message: String): Unit = println("=" * 120 + s"\n$message\n" + "=" * 120)
-
-  def warn(message: String): Unit = println(s"\n\u001b[33mWARNING: $message\u001b[0m\n")
 
   def error(message: String): Unit = System.err.println(s"\n\u001b[31mERROR: $message\u001b[0m\n")
 end ExperimentRunner

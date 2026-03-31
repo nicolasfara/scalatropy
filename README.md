@@ -30,7 +30,7 @@ You can then run the main methods provided in each example either by using your 
 java -cp out/examples/assembly.dest/out.jar <MAIN_PROGRAM_FQN>
 ```
 
-you need to replace `<MAIN_PROGRAM_FQN>` with the fully qualified name of the main object of the example you want to run, e.g., `it.unibo.pslab.examples.Pinger` or `it.unibo.pslab.examples.kvs.PrimaryNode`.
+you need to replace `<MAIN_PROGRAM_FQN>` with the fully qualified name of the main object of the example you want to run, e.g., `it.unibo.pslab.Pinger` or `it.unibo.pslab.kvs.PrimaryNode`.
 
 > [!NOTE]
 > Once started, each node will wait some seconds (by default, 7 seconds) to allow the discovery of all the other parties. Once the discovery phase is completed, the execution of the choreography will start and you will see the output of each node in the console.

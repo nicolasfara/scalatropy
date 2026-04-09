@@ -37,20 +37,24 @@ object PeersV2:
   import Peers.Peer
 
   enum Quantifier[-P <: Peer, -Comm <: CommunicationProtocol]:
-    case SingleCommLink()
-    case MultipleCommLink()
+    case SingleLink()
+    case MultipleLink()
 
   import Quantifier.*
 
   // Typed DSL for expressing architecture
-  type through[Comm <: CommunicationProtocol] = Comm
-  infix type toSingle[Comm <: CommunicationProtocol, P <: Peer] = SingleCommLink[P, Comm]
-  infix type toMultiple[Comm <: CommunicationProtocol, P <: Peer] = MultipleCommLink[P, Comm]
+  type via[Comm <: CommunicationProtocol] = Comm
+  infix type toSingle[Comm <: CommunicationProtocol, P <: Peer] = SingleLink[P, Comm]
+  infix type toMultiple[Comm <: CommunicationProtocol, P <: Peer] = MultipleLink[P, Comm]
+
+  // alternative syntax
+  type through[Q <: Quantifier[?, ?]] = Q
 
   // At the moment, let's stick with a single communication protocol...
-  // later we can create a more advanced notion of Network and CommunicationProtocol: sync, async.
-  type TiedWithSingle[P <: Peer] = { type Tie <: SingleCommLink[P, ?] }
-  type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleCommLink[P, ?] }
+  // later we can create a more advanced notion of Network and CommunicationProtocol comprising
+  // Sync and Async protocols.
+  type TiedWithSingle[P <: Peer] = { type Tie <: SingleLink[P, ?] }
+  type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleLink[P, ?] }
 
   sealed trait CommunicationProtocolEvidence[P <: Peer, R <: Peer]
   private case class CommProtocolEv[P <: Peer, R <: Peer](tag: String) extends CommunicationProtocolEvidence[P, R]
@@ -83,11 +87,13 @@ object PeersV2:
         report.errorAndAbort(s"Expected a Quantifier type, got: ${tpe.show}")
       tpe.typeArgs match
         case comm :: peer :: Nil => comm
-        case other => report.errorAndAbort(s"Unexpected 2 type arguments for Quantifier, got: ${other.length}")
+        case appliedType :: Nil  => appliedType.typeArgs.head
+        case _                   => report.errorAndAbort(s"Cannot extract communication protocol.")
 
     val pComms = extractTies(TypeRepr.of[P]).map(extractComm)
     val rComms = extractTies(TypeRepr.of[R]).map(extractComm)
     val common = pComms.filter(t => rComms.exists(_ =:= t))
+
     if common.isEmpty then report.errorAndAbort(s"""
       | Incompatible types: 
       | - ${TypeRepr.of[P].show} has Tie = ${pComms.map(_.show).mkString(" & ")}

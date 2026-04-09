@@ -24,7 +24,7 @@ import upickle.default as upickle
 import upickle.ReadWriter
 import it.unibo.pslab.network.CommunicationProtocol
 
-trait MqttNetwork extends CommunicationProtocol:
+trait MQTT extends CommunicationProtocol:
   override val tag: Tag = "MqttNetwork"
 
 object MqttNetwork:
@@ -93,7 +93,7 @@ object MqttNetwork:
       peers: Ref[F, Set[Address]],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
   ) extends BaseNetwork[F, LP, Address]
-      with MqttNetwork:
+      with MQTT:
     override type Address[P <: Peer] = MqttNetwork.Address
 
     val startTopic = Topics.start(networkConfig.appId)

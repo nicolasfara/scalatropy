@@ -1,0 +1,46 @@
+List(
+    AppliedType(
+        TypeRef(
+            TermRef(
+                TermRef(
+                    TermRef(
+                        TermRef(
+                            TermRef(
+                                ThisType(TypeRef(NoPrefix,module class <root>)),
+                                object it
+                            ),object unibo
+                        ),object pslab
+                    ),object peers
+                ),object PeersV2
+            ),
+            type toSingle
+        ),
+        List(
+            TypeRef(
+                TermRef(
+                    TermRef(
+                        TermRef(
+                            TermRef(
+                                TermRef(
+                                    ThisType(TypeRef(NoPrefix,module class <root>)),
+                                    object it
+                                ),
+                                object unibo
+                            ),object pslab
+                        ),object network
+                    ),object mqtt
+                ),
+                trait MQTT
+            ), 
+            TypeRef(
+                ThisType(
+                    TypeRef(
+                        ThisType(TypeRef(NoPrefix,module class pslab)),
+                        module class ManualTests$
+                    )
+                ),
+                type Server
+            )
+        )
+    )
+)

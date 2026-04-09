@@ -11,7 +11,7 @@ import cats.effect.std.Console
 import cats.syntax.all.*
 import it.unibo.pslab.network.CommunicationProtocol
 
-trait InMemoryNetwork extends CommunicationProtocol:
+trait Memory extends CommunicationProtocol:
   override val tag: Tag = "InMemoryNetwork"
 
 object InMemoryNetwork:
@@ -65,7 +65,7 @@ object InMemoryNetwork:
       messagesDispatcher: MessagesDispatcher[F],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
   ) extends BaseNetwork[F, LP, Address]
-      with InMemoryNetwork:
+      with Memory:
     override type Address[P <: Peer] = InMemoryNetwork.Address
 
     override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[Address[RP]]] =

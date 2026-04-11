@@ -42,17 +42,16 @@ object PeersV2:
 
   import Quantifier.*
 
-  // Typed DSL for expressing architecture
-  type via[Comm <: CommunicationProtocol] = Comm
+  // Typed DSL for expressing architecture:
+  // ```scala
+  // via[MQTT toSingle Client] & via[Memory toMultiple Database]
+  // ```
   infix type toSingle[Comm <: CommunicationProtocol, P <: Peer] = SingleLink[P, Comm]
   infix type toMultiple[Comm <: CommunicationProtocol, P <: Peer] = MultipleLink[P, Comm]
+  type via[Q <: Quantifier[?, ?]] = Q
 
-  // alternative syntax
-  type through[Q <: Quantifier[?, ?]] = Q
-
-  // At the moment, let's stick with a single communication protocol...
-  // later we can create a more advanced notion of Network and CommunicationProtocol comprising
-  // Sync and Async protocols.
+  // At the moment, let's stick with a single communication protocol (the Sync one)
+  // later we can create a more advanced CommunicationProtocol comprising Sync and Async protocols.
   type TiedWithSingle[P <: Peer] = { type Tie <: SingleLink[P, ?] }
   type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleLink[P, ?] }
 
@@ -82,30 +81,34 @@ object PeersV2:
         case other =>
           report.errorAndAbort(s"Expected type X <: { type Tie <: ... }, got: ${other.show}")
 
-    def extractComm(tpe: TypeRepr): TypeRepr =
+    def extractCommAndPeer(tpe: TypeRepr): (TypeRepr, TypeRepr) =
       if !(tpe <:< TypeRepr.of[Quantifier[?, ?]]) then
         report.errorAndAbort(s"Expected a Quantifier type, got: ${tpe.show}")
       tpe.typeArgs match
-        case comm :: peer :: Nil => comm
-        case appliedType :: Nil  => appliedType.typeArgs.head
-        case _                   => report.errorAndAbort(s"Cannot extract communication protocol.")
+        // AppliedType represents the application of a type constructor, in this case `via[Comm, Peer]`
+        case appliedType :: Nil =>
+          appliedType.typeArgs match
+            case comm :: peer :: Nil => (comm, peer)
+            case _ => report.errorAndAbort(s"Expected either toSingle[Comm, Peer] or toMultiple[Comm, Peer].")
+        case _ => report.errorAndAbort(s"Cannot extract communication protocol.")
 
-    val pComms = extractTies(TypeRepr.of[P]).map(extractComm)
-    val rComms = extractTies(TypeRepr.of[R]).map(extractComm)
-    val common = pComms.filter(t => rComms.exists(_ =:= t))
+    val pComms = extractTies(TypeRepr.of[P])
+      .map(extractCommAndPeer)
+      .filter((_, r) => r =:= TypeRepr.of[R]) // take only the type repr of the "other" peer
+      .map(_._1)
+    val rComms = extractTies(TypeRepr.of[R])
+      .map(extractCommAndPeer)
+      .filter((_, r) => r =:= TypeRepr.of[P]) // take only the type repr of the "other" peer
+      .map(_._1)
 
-    if common.isEmpty then report.errorAndAbort(s"""
-      | Incompatible types: 
+    if pComms.length > 1 || rComms.length > 1 then
+      report.errorAndAbort("No more than one link can exists between two peer types")
+    else if pComms.head != rComms.head then report.errorAndAbort(s"""Incompatible types:
       | - ${TypeRepr.of[P].show} has Tie = ${pComms.map(_.show).mkString(" & ")}
       | but
       | - ${TypeRepr.of[R].show} has Tie = ${rComms.map(_.show).mkString(" & ")}
       | no common communication protocol found!
       """.stripMargin)
-    else if common.size > 1 then report.errorAndAbort(s"""
-      | Ambiguous communication protocols found between ${TypeRepr.of[P].show} and ${TypeRepr.of[R].show}:
-      | ${common.map(_.show).mkString("\n - ")}
-      | Please disambiguate by ensuring only one common communication protocol is shared between the two peers.
-      """.stripMargin)
 
-    val tag = Expr(common.head.show)
+    val tag = Expr(pComms.head.show)
     '{ CommProtocolEv[P, R]($tag) }

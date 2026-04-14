@@ -73,7 +73,6 @@ object PeersV2:
       tpe.typeArgs match
         // `AppliedType` represents the application of a type constructor, in this case `Quantifier[Comm, Peer]`
         case appliedType :: Nil =>
-          report.info(appliedType.show)
           appliedType.typeArgs match
             case comm :: peer :: Nil => (comm, peer)
             case _                   => report.errorAndAbort("Expected a type constructor Quantifier[Comm, Peer].")
@@ -82,7 +81,7 @@ object PeersV2:
     def extractCommsBetween[P1 <: Peer: Type, P2 <: Peer: Type] =
       extractTies(TypeRepr.of[P1])
         .map(extractCommAndPeer)
-        .filter((_, peer) => peer =:= TypeRepr.of[P2]) // consider only Communication Protocols of P1 with P2
+        .filter((_, peer) => peer =:= TypeRepr.of[P2]) // consider only Communication Protocols of P1 and P2
         .map(_._1)
 
     val pComms = extractCommsBetween[P, R]
@@ -96,5 +95,5 @@ object PeersV2:
       | no common communication protocol found!
       """.stripMargin)
 
-    val tag = Expr(pComms.head.typeSymbol.fullName)
+    val tag = Expr(pComms.head.typeSymbol.name)
     '{ CommProtocolEv[P, R]($tag) }

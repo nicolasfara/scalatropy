@@ -12,7 +12,7 @@ import cats.syntax.all.*
 import it.unibo.pslab.network.CommunicationProtocol
 
 trait Memory extends CommunicationProtocol:
-  override val tag: Tag = "it.unibo.pslab.network.memory.Memory"
+  override inline val tag = "Memory"
 
 object InMemoryNetwork:
 

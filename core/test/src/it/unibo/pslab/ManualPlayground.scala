@@ -1,7 +1,5 @@
 package it.unibo.pslab
 
-// A playground where performing manual tests and having fun while developing :)
-
 object ManualTest1:
   import it.unibo.pslab.peers.PeersV2.*
   import it.unibo.pslab.multiparty.MultiPartyV2

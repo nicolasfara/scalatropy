@@ -2,13 +2,20 @@ package it.unibo.pslab.network
 
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
+
 import cats.data.NonEmptyList
 
-trait CommunicationProtocol:
-  type Tag = String
+/**
+ * Marker trait to define communication protocols between peer types.
+ * @example
+ *   {{{trait MQTT extends CommunicationProtocol}}}
+ */
+trait CommunicationProtocol
 
-  val tag: Tag
-
+/**
+ * The Network layer, implementing a [[CommunicationProtocol]], abstracting the underlying communication mechanism and
+ * providing a uniform interface for sending and receiving messages between peers
+ */
 trait Network[F[_], LP <: Peer] extends CommunicationProtocol:
   type Address[P <: Peer]
 

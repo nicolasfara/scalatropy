@@ -4,21 +4,6 @@ import scala.quoted.{ Expr, Quotes, Type }
 
 import it.unibo.pslab.network.CommunicationProtocol
 
-/*
- * Motivation
- * ==========
- * 
- * - architectural definition enables expressing for each link between two peer types different communication
- *   protocols
- *   - e.g., client and primary server communicates via a sync communication style (e.g., ReST) while
- *     primary server and sensors communicate via an async channel (e.g. RabbitMQ or MQTT)
- * 
- * - at runtime, the communication happens via the protocol defined by the architectural definition
- * 
- * - at compile-time, any incoherent architectural definition is rejected by the compiler
- *   - e.g., if the client and server are defined to have a link with different communication protocols,
- *     the program will not compile
- */
 object PeersV2:
   export Peers.{ Peer, PeerTag }
 
@@ -41,14 +26,16 @@ object PeersV2:
   type TiedWithSingle[P <: Peer] = { type Tie <: SingleLink[P, ?] }
   type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleLink[P, ?] }
 
-  sealed trait CommunicationProtocolEvidence[P <: Peer, R <: Peer]:
-    val tag: String
-  private case class CommProtocolEv[P <: Peer, R <: Peer](tag: String) extends CommunicationProtocolEvidence[P, R]
+  sealed trait CommunicationProtocolEvidence[P <: Peer, R <: Peer] extends (CommunicationProtocol => Boolean)
+  private case class CommProtocolEv[P <: Peer, R <: Peer](
+      logic: CommunicationProtocol => Boolean,
+  ) extends CommunicationProtocolEvidence[P, R]:
+    override def apply(protocol: CommunicationProtocol): Boolean = logic(protocol)
 
-  inline given syntesizePeerTagCommProtocolEv[P <: Peer, R <: Peer]: CommunicationProtocolEvidence[P, R] =
-    ${ syntesizePeerTagCommProtocolEvImpl[P, R] }
+  inline given syntesizeCommProtocolEvidence[P <: Peer, R <: Peer]: CommunicationProtocolEvidence[P, R] =
+    ${ syntesizeCommProtocolEvidenceImpl[P, R] }
 
-  private def syntesizePeerTagCommProtocolEvImpl[P <: Peer: Type, R <: Peer: Type](using
+  private def syntesizeCommProtocolEvidenceImpl[P <: Peer: Type, R <: Peer: Type](using
       quotes: Quotes,
   ): Expr[CommunicationProtocolEvidence[P, R]] =
     import quotes.reflect.*
@@ -94,6 +81,8 @@ object PeersV2:
       | - ${TypeRepr.of[R].show} has Tie = ${rComms.map(_.show).mkString(" & ")}
       | no common communication protocol found!
       """.stripMargin)
+    else if !(pComms.head <:< TypeRepr.of[CommunicationProtocol]) then
+      report.errorAndAbort(s"Extracted type ${pComms.head.show} is not a `CommunicationProtocol`")
 
-    val tag = Expr(pComms.head.typeSymbol.name)
-    '{ CommProtocolEv[P, R]($tag) }
+    pComms.head.asType match
+      case '[t] => '{ CommProtocolEv[P, R](_.isInstanceOf[t]) }

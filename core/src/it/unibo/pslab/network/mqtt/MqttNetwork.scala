@@ -24,8 +24,7 @@ import upickle.default as upickle
 import upickle.ReadWriter
 import it.unibo.pslab.network.CommunicationProtocol
 
-trait MQTT extends CommunicationProtocol:
-  override val tag = "MQTT"
+trait MQTT extends CommunicationProtocol
 
 object MqttNetwork:
 

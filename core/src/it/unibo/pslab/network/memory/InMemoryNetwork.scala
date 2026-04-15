@@ -11,8 +11,7 @@ import cats.effect.std.Console
 import cats.syntax.all.*
 import it.unibo.pslab.network.CommunicationProtocol
 
-trait Memory extends CommunicationProtocol:
-  override inline val tag = "Memory"
+trait Memory extends CommunicationProtocol
 
 object InMemoryNetwork:
 

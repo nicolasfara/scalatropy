@@ -2,12 +2,11 @@ package it.unibo.pslab.multiparty
 
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiPartyV2.on
-import it.unibo.pslab.network.Network
+import it.unibo.pslab.network.{ Codable, Network }
 import it.unibo.pslab.peers.PeersV2.{ CommunicationProtocolEvidence, Peer, PeerTag, TiedWithSingle }
 
 import cats.Monad
 import cats.syntax.all.*
-import it.unibo.pslab.network.Codable
 
 trait MultiPartyV2[F[_]]:
 
@@ -64,12 +63,10 @@ object MultiPartyV2:
     override def comm[From <: TiedWithSingle[To], To <: TiedWithSingle[From]](using
         from: PeerTag[From],
         to: PeerTag[To],
-        protocol: CommunicationProtocolEvidence[From, To],
+        matchingProtocol: CommunicationProtocolEvidence[From, To],
     )[V: Codable[F]](value: V on From): F[V on To] =
       val runtimePeer = summon[PeerTag[P]]
-      println(s"====> TAG: ${protocol.tag}")
-      networks.foreach(n => println(s"====> AVAILABLE NETWORK: ${n.tag}"))
-      val network = networks.find(_.tag == protocol.tag).get
+      val network = networks.find(matchingProtocol).get
       if runtimePeer == from then
         val Placement.Local(res, v) = value.runtimeChecked
         for

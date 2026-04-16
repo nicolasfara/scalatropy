@@ -5,7 +5,16 @@ import java.util.UUID
 import scala.concurrent.duration.{ DurationLong, FiniteDuration }
 
 import it.unibo.pslab.multiparty.Environment.Reference
-import it.unibo.pslab.network.{BaseNetwork, CommunicationProtocol, Decodable, Encodable, Network, NetworkError, NetworkMonitor, NoSuchPeers}
+import it.unibo.pslab.network.{
+  BaseNetwork,
+  Decodable,
+  Encodable,
+  IoT,
+  Network,
+  NetworkError,
+  NetworkMonitor,
+  NoSuchPeers,
+}
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
@@ -22,8 +31,6 @@ import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
 import upickle.ReadWriter
-
-trait MQTT extends CommunicationProtocol
 
 object MqttNetwork:
 
@@ -91,7 +98,7 @@ object MqttNetwork:
       peers: Ref[F, Set[Address]],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
   ) extends BaseNetwork[F, LP, Address]
-      with MQTT:
+      with IoT:
     override type Address[P <: Peer] = MqttNetwork.Address
 
     val startTopic = Topics.start(networkConfig.appId)

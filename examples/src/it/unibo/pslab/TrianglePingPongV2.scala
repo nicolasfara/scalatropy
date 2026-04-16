@@ -5,7 +5,8 @@ import scala.concurrent.duration.DurationInt
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.MultiPartyV2
 import it.unibo.pslab.multiparty.MultiPartyV2.*
-import it.unibo.pslab.network.mqtt.{ MQTT, MqttNetwork }
+import it.unibo.pslab.network.IoT
+import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
 import it.unibo.pslab.peers.PeersV2.*
 
@@ -19,9 +20,9 @@ import upickle.default.ReadWriter
 import TrianglePingPongV2.*
 
 object TrianglePingPongV2:
-  type Alice <: { type Tie <: via[MQTT toSingle Bob] & via[MQTT toSingle Andromeda] }
-  type Bob <: { type Tie <: via[MQTT toSingle Alice] & via[MQTT toSingle Andromeda] }
-  type Andromeda <: { type Tie <: via[MQTT toSingle Bob] & via[MQTT toSingle Alice] }
+  type Alice <: { type Tie <: via[IoT toSingle Bob] & via[IoT toSingle Andromeda] }
+  type Bob <: { type Tie <: via[IoT toSingle Alice] & via[IoT toSingle Andromeda] }
+  type Andromeda <: { type Tie <: via[IoT toSingle Bob] & via[IoT toSingle Alice] }
 
   def pingPongProgram[F[_]: {Monad, Console, Temporal}](using MultiPartyV2[F]): F[Unit] = for
     initial <- on[Alice](0.pure)

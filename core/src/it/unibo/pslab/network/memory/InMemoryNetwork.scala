@@ -1,7 +1,16 @@
 package it.unibo.pslab.network.memory
 
 import it.unibo.pslab.multiparty.Environment.Reference
-import it.unibo.pslab.network.{BaseNetwork, CommunicationProtocol, Decodable, Encodable, Network, NetworkError, NetworkMonitor, NoSuchPeers}
+import it.unibo.pslab.network.{
+  BaseNetwork,
+  Decodable,
+  Encodable,
+  Memory,
+  Network,
+  NetworkError,
+  NetworkMonitor,
+  NoSuchPeers,
+}
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
@@ -9,8 +18,6 @@ import cats.data.NonEmptyList
 import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
-
-trait Memory extends CommunicationProtocol
 
 object InMemoryNetwork:
 

@@ -8,7 +8,7 @@ import cats.data.NonEmptyList
 /**
  * Marker trait to define communication protocols between peer types.
  * @example
- *   {{{trait MQTT extends CommunicationProtocol}}}
+ *   {{{trait IoT extends CommunicationProtocol}}}
  */
 trait CommunicationProtocol
 

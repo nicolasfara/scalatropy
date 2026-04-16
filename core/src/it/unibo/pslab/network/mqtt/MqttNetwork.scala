@@ -5,7 +5,7 @@ import java.util.UUID
 import scala.concurrent.duration.{ DurationLong, FiniteDuration }
 
 import it.unibo.pslab.multiparty.Environment.Reference
-import it.unibo.pslab.network.{ BaseNetwork, Decodable, Encodable, Network, NetworkError, NetworkMonitor, NoSuchPeers }
+import it.unibo.pslab.network.{BaseNetwork, CommunicationProtocol, Decodable, Encodable, Network, NetworkError, NetworkMonitor, NoSuchPeers}
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
@@ -22,7 +22,6 @@ import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
 import upickle.ReadWriter
-import it.unibo.pslab.network.CommunicationProtocol
 
 trait MQTT extends CommunicationProtocol
 

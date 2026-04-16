@@ -1,11 +1,12 @@
 package it.unibo.pslab.matmul
 
-import cats.data.NonEmptyList
-import cats.effect.{ ExitCode, IO, IOApp, Resource }
-import cats.syntax.all.*
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.network.NetworkMonitor.withCsvMonitoring
 import it.unibo.pslab.network.memory.InMemoryNetwork
+
+import cats.data.NonEmptyList
+import cats.effect.{ ExitCode, IO, IOApp, Resource }
+import cats.syntax.all.*
 
 /*
  * These two main objects run the evaluation of the matmul implementation using both the selective and the broadcasting

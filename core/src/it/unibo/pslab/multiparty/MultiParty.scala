@@ -1,5 +1,7 @@
 package it.unibo.pslab.multiparty
 
+import scala.compiletime.Erased
+
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.{ Codable, Network }
 import it.unibo.pslab.peers.Peers.*
@@ -9,7 +11,6 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 
 import MultiParty.on
-import scala.compiletime.Erased
 
 trait Label[+V] extends Erased
 

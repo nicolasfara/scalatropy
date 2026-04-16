@@ -1,10 +1,9 @@
 package it.unibo.pslab.network
 
-import cats.effect.kernel.Sync
-import java.io.BufferedWriter
+import java.io.{BufferedWriter, FileWriter}
+
 import cats.Applicative
-import cats.effect.kernel.Resource
-import java.io.FileWriter
+import cats.effect.kernel.{Resource, Sync}
 
 trait NetworkMonitor[F[_]]:
   def onSend(payload: Array[Byte]): F[Unit]

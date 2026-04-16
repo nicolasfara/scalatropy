@@ -28,8 +28,12 @@ jobs:
           java-version: ${{ matrix.jdk }}
       - name: Build project
         run: ./mill __.compile
+      - name: Run tests
+        run: ./mill __.test
       - name: Assemble project
         run: ./mill examples.assembly
+      - name: Linting
+        run: ./mill __.fix --check && ./mill mill.scalalib.scalafmt/checkFormatAll
 
   evaluation:
     runs-on: ubuntu-24.04

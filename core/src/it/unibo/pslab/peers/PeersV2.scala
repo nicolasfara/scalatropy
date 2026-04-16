@@ -35,6 +35,7 @@ object PeersV2:
   inline given syntesizeCommProtocolEvidence[P <: Peer, R <: Peer]: CommunicationProtocolEvidence[P, R] =
     ${ syntesizeCommProtocolEvidenceImpl[P, R] }
 
+  @SuppressWarnings(Array("scalafix:DisableSyntax.isInstanceOf"))
   private def syntesizeCommProtocolEvidenceImpl[P <: Peer: Type, R <: Peer: Type](using
       quotes: Quotes,
   ): Expr[CommunicationProtocolEvidence[P, R]] =

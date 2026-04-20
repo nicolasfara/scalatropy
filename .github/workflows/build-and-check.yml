@@ -38,3 +38,16 @@ jobs:
       - *checkout-repo
       - name: Run evaluation
         run: docker compose up evaluation
+
+  success:
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+    if: >-
+      always() && (
+        contains(join(needs.*.result, ','), 'failure')
+        || !contains(join(needs.*.result, ','), 'cancelled')
+      )
+    steps:
+      - name: Verify that there were no failures
+        run: ${{ !contains(join(needs.*.result, ','), 'failure') }}

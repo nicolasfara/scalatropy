@@ -1,12 +1,16 @@
 //| mvnDeps:
 //| - com.goyeau::mill-scalafix::0.6.0
+//| - com.github.lolgab::mill-crossplatform::0.3.0
 
 package build
 
 import mill.*
 import scalalib.*
+import com.github.lolgab.mill.crossplatform.CrossPlatform
 import com.goyeau.mill.scalafix.ScalafixModule
 import mill.api.Task.Simple
+import mill.scalanativelib.ScalaNativeModule
+import mill.scalajslib.ScalaJSModule
 
 trait CommonScala extends ScalaModule with ScalafixModule {
   def scalaVersion = "3.8.1"
@@ -28,25 +32,52 @@ trait CommonScala extends ScalaModule with ScalafixModule {
     // but it's actually correct and works fine with the compiler, so we can ignore these warnings)
     "-Wconf:msg=Internal error in extracting SemanticDB:s",
   )
+}
 
-  def mvnDeps = Seq(
-    mvn"org.typelevel::cats-core:2.13.0",
-    mvn"org.typelevel::cats-free:2.13.0",
-    mvn"org.typelevel::cats-effect:3.6.3",
-    mvn"net.sigusr::fs2-mqtt:1.0.1",
-    mvn"com.lihaoyi::upickle:4.4.2",
+trait CommonTests extends TestModule.ScalaTest {
+  def testParallelism = true
+  override def mvnDeps = super.mvnDeps() ++ Seq(
+    mvn"org.scalatest::scalatest::3.2.19",
   )
 }
 
-object core extends CommonScala {
-  object test extends ScalaTests with TestModule.ScalaTest {
-    def testParallelism = true
-    def mvnDeps = Seq(
-      mvn"org.scalatest::scalatest:3.2.19",
-    )
-  }
+trait CommonJvm extends CommonScala {
+  object test extends ScalaTests with CommonTests
 }
 
-object examples extends CommonScala {
-  def moduleDeps = Seq(core)
+trait CommonNative extends ScalaNativeModule {
+  def scalaNativeVersion = "0.5.11"
+  object test extends ScalaNativeTests with CommonTests
+}
+
+trait CommonJS extends ScalaJSModule {
+  def scalaJSVersion = "1.21.0"
+  object test extends ScalaJSTests with CommonTests
+}
+
+object core extends CrossPlatform {
+  trait Shared extends CrossPlatformScalaModule with CommonScala {
+    def mvnDeps = super.mvnDeps() ++ Seq(
+      mvn"org.typelevel::cats-core::2.13.0",
+      mvn"org.typelevel::cats-effect::3.7.0",
+      mvn"com.lihaoyi::upickle::4.4.2",
+    )
+  }
+
+  object jvm extends Shared with CommonJvm
+
+  object native extends Shared with CommonNative
+
+  object js extends Shared with CommonJS
+}
+
+object distributed extends CommonJvm {
+  def moduleDeps: Seq[JavaModule] = Seq(core.jvm)
+  def mvnDeps = super.mvnDeps() ++ Seq(
+    mvn"net.sigusr::fs2-mqtt:1.0.1",
+  )
+}
+
+object examples extends CommonJvm {
+  def moduleDeps = Seq(distributed)
 }

@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, ubuntu-24.04]
-        jdk: [17, 21, 25]
+        os: [ macos-15, ubuntu-24.04 ]
+        jdk: [ 17, 21, 25 ]
     steps:
       - &checkout-repo
         name: Check out repository
@@ -41,12 +41,13 @@ jobs:
     steps:
       - *checkout-repo
       - name: Run evaluation
-        run: docker compose up evaluation
+        run: docker compose up --exit-code-from evaluation evaluation
 
   success:
     runs-on: ubuntu-24.04
     needs:
       - build
+      - evaluation
     if: >-
       always() && (
         contains(join(needs.*.result, ','), 'failure')

@@ -2,6 +2,7 @@ package it.unibo.pslab
 
 import scala.concurrent.duration.DurationInt
 
+import it.unibo.pslab.ScalaTropyV2.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.MultiPartyV2
 import it.unibo.pslab.multiparty.MultiPartyV2.*
@@ -54,18 +55,26 @@ object TrianglePingPongV2:
 
 object BobV2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Bob](Configuration(appId = "triangle-pingpong"))
-    val networks = Set(mqttNetwork)
-    ScalaTropyV2(pingPongProgram[IO]).projectedOn[Bob](using networks)
+    MqttNetwork
+      .localBroker[IO, Bob](Configuration(appId = "triangle-pingpong"))
+      .use: mqttNet =>
+        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Bob]:
+          tiedTo[Alice] via mqttNet
 
 object AndromedaV2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Andromeda](Configuration(appId = "triangle-pingpong"))
-    val networks = Set(mqttNetwork)
-    ScalaTropyV2(pingPongProgram[IO]).projectedOn[Andromeda](using networks)
+    MqttNetwork
+      .localBroker[IO, Andromeda](Configuration(appId = "triangle-pingpong"))
+      .use: mqttNet =>
+        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Andromeda]:
+          tiedTo[Alice] via mqttNet
+          tiedTo[Bob] via mqttNet
 
 object AliceV2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Alice](Configuration(appId = "triangle-pingpong"))
-    val networks = Set(mqttNetwork)
-    ScalaTropyV2(pingPongProgram[IO]).projectedOn[Alice](using networks)
+    MqttNetwork
+      .localBroker[IO, Alice](Configuration(appId = "triangle-pingpong"))
+      .use: mqttNet =>
+        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Alice]:
+          tiedTo[Bob] via mqttNet
+          tiedTo[Andromeda] via mqttNet

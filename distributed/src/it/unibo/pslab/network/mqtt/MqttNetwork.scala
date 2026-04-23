@@ -32,6 +32,8 @@ import upickle.default as upickle
 
 import upickle.ReadWriter
 
+trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP] with IoT
+
 object MqttNetwork:
 
   case class Address(tag: PeerTag[?], clientId: String) derives ReadWriter
@@ -52,27 +54,28 @@ object MqttNetwork:
 
   def fromEnv[F[_]: {Concurrent, Env, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag](
       config: Configuration,
-  ): Resource[F, Network[F, LP]] =
+  ): Resource[F, MqttNetwork[F, LP]] =
     def env[A](name: String, parse: String => Option[A]): F[A] =
       OptionT(F.get(name))
         .subflatMap(parse)
         .getOrElseF(Concurrent[F].raiseError(InvalidConfiguration(s"Env $name is required and must be valid")))
-    for
+    val nn = for
       (host, port) <- Resource.eval:
         (env("MQTT_BROKER_HOST", Host.fromString), env("MQTT_BROKER_PORT", Port.fromString)).parTupled
       network <- make(config, TransportConfig(host, port), SessionConfig(config.clientId, cleanSession = false))
     yield network
+    nn
 
   def localBroker[F[_]: {Concurrent, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag](
       config: Configuration,
-  ): Resource[F, Network[F, LP]] =
+  ): Resource[F, MqttNetwork[F, LP]] =
     make(config, TransportConfig(host"localhost", port"1883"), SessionConfig(config.clientId, cleanSession = false))
 
   def make[F[_]: {Concurrent, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag as localPeerTag](
       networkConfig: Configuration,
       transportConfig: TransportConfig[F],
       sessionConfig: SessionConfig,
-  ): Resource[F, Network[F, LP]] =
+  ): Resource[F, MqttNetwork[F, LP]] =
     for
       _ <- Resource.eval(F.println(s"=== Peers startup configuration [wait ${networkConfig.initialWaitWindow}] ==="))
       session <- Session(transportConfig, sessionConfig)
@@ -97,8 +100,8 @@ object MqttNetwork:
       started: Deferred[F, Unit],
       peers: Ref[F, Set[Address]],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
-  ) extends BaseNetwork[F, LP, Address]
-      with IoT:
+  ) extends MqttNetwork[F, LP]
+      with BaseNetwork[F, LP, Address]:
     override type Address[P <: Peer] = MqttNetwork.Address
 
     val startTopic = Topics.start(networkConfig.appId)

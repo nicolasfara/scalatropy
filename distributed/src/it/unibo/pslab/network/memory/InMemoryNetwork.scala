@@ -19,6 +19,8 @@ import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
 
+trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP] with Memory
+
 object InMemoryNetwork:
 
   case class Address(tag: PeerTag[?], id: String)
@@ -54,7 +56,7 @@ object InMemoryNetwork:
       localId: String,
       knownPeers: NonEmptyList[Address],
       messagesDispatcher: MessagesDispatcher[F],
-  ): Resource[F, Network[F, LP]] =
+  ): Resource[F, InMemoryNetwork[F, LP]] =
     Resource.make(
       for
         incomingMsgs <- Ref.of(IncomingMessages.empty[F, Address])
@@ -69,8 +71,8 @@ object InMemoryNetwork:
       knownPeers: NonEmptyList[Address],
       messagesDispatcher: MessagesDispatcher[F],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, Address]],
-  ) extends BaseNetwork[F, LP, Address]
-      with Memory:
+  ) extends InMemoryNetwork[F, LP]
+      with BaseNetwork[F, LP, Address]:
     override type Address[P <: Peer] = InMemoryNetwork.Address
 
     override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[Address[RP]]] =

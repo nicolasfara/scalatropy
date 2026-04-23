@@ -23,7 +23,7 @@ trait MultiPartyV2[F[_]]:
 object MultiPartyV2:
   infix opaque type on[+V, -P <: Peer] = Placement[V, P]
 
-  private[multiparty] enum Placement[+V, -P <: Peer](val res: Reference):
+  private enum Placement[+V, -P <: Peer](val res: Reference):
     case Local(override val res: Reference, value: V) extends Placement[V, P](res)
     case Remote(override val res: Reference) extends Placement[V, P](res)
 

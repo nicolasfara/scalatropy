@@ -7,7 +7,7 @@ import it.unibo.pslab.network.CommunicationProtocol
 object PeersV2:
   export Peers.{ Peer, PeerTag }
 
-  enum Quantifier[-P <: Peer, -Comm <: CommunicationProtocol]:
+  enum Quantifier[P <: Peer, Comm <: CommunicationProtocol]:
     case SingleLink()
     case MultipleLink()
 
@@ -23,6 +23,10 @@ object PeersV2:
 
   // At the moment, let's stick with a single communication protocol (the Sync one)
   // later we can create a more advanced CommunicationProtocol comprising Sync and Async protocols.
+
+  type TiedTo[P <: Peer] = { type Tie <: Quantifier[P, ?] }
+  type TiedWithComm[P <: Peer, Comm <: CommunicationProtocol] = { type Tie <: Quantifier[P, Comm] }
+
   type TiedWithSingle[P <: Peer] = { type Tie <: SingleLink[P, ?] }
   type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleLink[P, ?] }
 

@@ -100,7 +100,9 @@ object ExperimentRunner:
 
   def info(message: String): Unit = println("=" * 120 + s"\n$message\n" + "=" * 120)
 
-  def error(message: String): Unit = System.err.println(s"\n\u001b[31mERROR: $message\u001b[0m\n")
+  def error(message: String): Unit =
+    System.err.println(s"\n\u001b[31mERROR: $message\u001b[0m\n")
+    System.exit(1)
 end ExperimentRunner
 
 ExperimentRunner.main(args)

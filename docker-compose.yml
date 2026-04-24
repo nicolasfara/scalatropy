@@ -17,6 +17,7 @@ services:
       # mounts project files into the container via volumes instead of copying them in Dockerfile
       # to allow to run the most-up-to-date code without rebuilding the image
       - ./core:/app/core
+      - ./distributed:/app/distributed
       - ./examples:/app/examples
       - ./evaluation:/app/evaluation
       - ./RunExperiments.sc:/app/RunExperiments.sc

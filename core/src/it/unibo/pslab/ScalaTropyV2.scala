@@ -2,7 +2,7 @@ package it.unibo.pslab
 
 import it.unibo.pslab.deployment.Deployment
 import it.unibo.pslab.multiparty.{ Environment, MultiPartyV2 }
-import it.unibo.pslab.network.Network
+import it.unibo.pslab.network.NetworkManager
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.Monad
@@ -10,7 +10,7 @@ import cats.Monad
 object ScalaTropyV2:
   export Deployment.*
 
-  opaque type ScalaTropyV2[F[_], Result] = Impl[F, Result]
+  opaque type ScalaTropyV2[F[_], Result, PeerId[_ <: Peer]] = Impl[F, Result, PeerId]
 
   /**
    * The main entry point for ScalaTropy program instantiation and interpretation. Use this method to create a
@@ -31,11 +31,13 @@ object ScalaTropyV2:
    * @return
    *   a value that can be projected on a specific peer, given an appropriate deployment strategy.
    */
-  def apply[F[_]: Monad, Result](program: MultiPartyV2[F] ?=> F[Result]): ScalaTropyV2[F, Result] = Impl(program)
+  def apply[F[_]: Monad, Result, PeerId[_ <: Peer]](
+      program: MultiPartyV2[F] ?=> F[Result],
+  ): ScalaTropyV2[F, Result, PeerId] = Impl(program)
 
-  final private class Impl[F[_]: Monad, Result](val program: MultiPartyV2[F] ?=> F[Result])
+  final private class Impl[F[_]: Monad, Result, PeerId[_ <: Peer]](val program: MultiPartyV2[F] ?=> F[Result])
 
-  extension [F[_], Result](trope: ScalaTropyV2[F, Result])
+  extension [F[_], Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result, PeerId])
     /**
      * Perform the End Point Projection of the ScalaTropy program on a specific peer type.
      *
@@ -49,13 +51,15 @@ object ScalaTropyV2:
      *   an effect that, when evaluated, yields the result of the program on the local peer
      */
     def projectedOn[Local <: Peer: PeerTag](
-        buildConnections: Deployment.Scope[F, Local] ?=> Unit,
+        buildConnections: Deployment.Scope[F, Local, PeerId] ?=> Unit,
     )(using Monad[F]): F[Result] =
-      val deployment = Deployment.Scope[F, Local]()
+      val deployment = Deployment.Scope[F, Local, PeerId]()
       buildConnections(using deployment)
       projection[Local](deployment.networks)
 
-    private inline def projection[Local <: Peer: PeerTag](networks: Set[Network[F, Local]])(using Monad[F]): F[Result] =
+    private inline def projection[Local <: Peer: PeerTag](
+        networks: Set[NetworkManager[F, Local, PeerId]],
+    )(using Monad[F]): F[Result] =
       val env = Environment.make[F]
       val language = MultiPartyV2.make(env, networks)
       trope.program(using language)

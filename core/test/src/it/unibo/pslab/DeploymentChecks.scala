@@ -1,10 +1,11 @@
 package it.unibo.pslab
 
-import org.scalatest.matchers.should
-import org.scalatest.funspec.AnyFunSpec
-import scala.compiletime.testing.{ Error, typeCheckErrors }
+import scala.compiletime.testing.{ typeCheckErrors, Error }
 
-class DeploymentTest extends AnyFunSpec with should.Matchers:
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should
+
+class DeploymentChecks extends AnyFunSpec with should.Matchers:
 
   inline val commonCode = """
     import _root_.it.unibo.pslab.ScalaTropyV2.*

@@ -27,8 +27,8 @@ object MatMulMaster extends IOApp:
       case _ => IO.println("Usage: MatMulMaster <num-workers> <label>").as(ExitCode.Error)
 
   private def runMatMul(numWorkers: Int, label: String): IO[Unit] =
-    val masterAddr = InMemoryNetwork.Address[Master]("master")
-    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.Address[Worker](s"worker-$i")).toList
+    val masterAddr = InMemoryNetwork.PeerId[Master]("master")
+    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.PeerId[Worker](s"worker-$i")).toList
     val allPeerAddrs = NonEmptyList(masterAddr, workerAddrs)
 
     val networksResource = Resource
@@ -59,8 +59,8 @@ object InefficientMatMulMaster extends IOApp:
       case _ => IO.println("Usage: InefficientMatMulMaster <num-workers> <label>").as(ExitCode.Error)
 
   private def runMatMul(numWorkers: Int, label: String): IO[Unit] =
-    val masterAddr = InMemoryNetwork.Address[Master]("master")
-    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.Address[Worker](s"worker-$i")).toList
+    val masterAddr = InMemoryNetwork.PeerId[Master]("master")
+    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.PeerId[Worker](s"worker-$i")).toList
     val allPeers = NonEmptyList(masterAddr, workerAddrs)
 
     val networksResource = Resource

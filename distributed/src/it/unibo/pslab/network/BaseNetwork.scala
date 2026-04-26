@@ -2,12 +2,10 @@ package it.unibo.pslab.network
 
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.Codable.{ decode, encode }
-import it.unibo.pslab.peers.Peers.Peer
+import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.effect.kernel.{ Concurrent, Deferred, Ref }
 import cats.syntax.all.*
-import it.unibo.pslab.peers.Peers.PeerTag
-
 import upickle.ReadWriter
 
 object BaseNetwork:

@@ -18,6 +18,8 @@ object Deployment:
   /**
    * Deployment scope for defining connections between the local projected peer and other peer types. Each connection is
    * bound to a network protocol, as defined by the program's architectural definition.
+   * @note
+   *   All network protocols must encode peer identifiers using the same [[PeerId]] type constructor.
    */
   class Scope[F[_], Local <: Peer, PeerId[_ <: Peer]]:
     private var localNetworks: Set[NetworkManager[F, Local, PeerId]] = Set()

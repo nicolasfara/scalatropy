@@ -46,8 +46,9 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
           ScalaTropyV2(app[IO]).projectedOn[Pinger]:
             tiedTo[Ponger] via wsNet
           """)
-          compileErrors should not be empty
-          println(s"Compile errors: ${compileErrors.map(_.message).mkString("\n")}")
+          compileErrors should have size 1
+          compileErrors.head.message should include:
+            "Cannot prove that Pinger <:< it.unibo.pslab.peers.PeersV2.TiedWithComm[Ponger, Protocol]"
 
       describe("because of wrong tie"):
         it("should not compile"):
@@ -57,8 +58,15 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
           ScalaTropyV2(app[IO]).projectedOn[Pinger]:
             tiedTo[AnotherPeer] via mqttNet
           """)
-          compileErrors should not be empty
-          println(s"Compile errors: ${compileErrors.map(_.message).mkString("\n")}")
+          compileErrors should have size 1
+          compileErrors.head.message should (
+            include:
+              """|No given instance of type it.unibo.pslab.deployment.Deployment.Scope[F, Local, PeerId]
+                 |was found for parameter deployment of method tiedTo
+                 |""".stripMargin.replaceAll("\\s+", " ")
+            and include:
+              "Local  is a type variable with constraint <: it.unibo.pslab.peers.PeersV2.TiedTo[AnotherPeer]"
+          )
 
       describe("because of using a network placed on a peer that is not the local one"):
         it("should not compile"):
@@ -68,5 +76,6 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
           ScalaTropyV2(app[IO]).projectedOn[Pinger]:
             tiedTo[Ponger] via mqttNetworkOnAlice
           """)
-          compileErrors should not be empty
-          println(s"Compile errors: ${compileErrors.map(_.message).mkString("\n")}")
+          compileErrors should have size 1
+          compileErrors.head.message should include:
+            "Required: it.unibo.pslab.network.NetworkManager[cats.effect.IO, Pinger, PeerId]"

@@ -58,10 +58,9 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
               _ <- comm[Client, Server](v)
             yield ()
         """)
-        compileErrors should not be empty
-        compileErrors.map(_.message).mkString should include(
-          "Server does not conform to upper bound it.unibo.pslab.peers.PeersV2.TiedWithSingle[Client]",
-        )
+        compileErrors should have size 1
+        compileErrors.head.message should include:
+          "Server does not conform to upper bound it.unibo.pslab.peers.PeersV2.TiedWithSingle[Client]"
 
     describe("when communication protocol are incoherent"):
       it("should not compile"):
@@ -76,8 +75,8 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
               _ <- comm[Client, Server](v)
             yield ()
         """)
-        compileErrors should not be empty
-        compileErrors.map(_.message).mkString should include("no common communication protocol found")
+        compileErrors should have size 1
+        compileErrors.head.message should include("no common communication protocol found")
 
     describe("when multiple links between two peer types exists"):
       it("should not compile"):
@@ -91,5 +90,5 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
               _ <- comm[Client, Server](v)
             yield ()
         """)
-        compileErrors should not be empty
-        compileErrors.map(_.message).mkString should include("No more than one link can exists between two peer types")
+        compileErrors should have size 1
+        compileErrors.head.message should include("No more than one link can exists between two peer types")

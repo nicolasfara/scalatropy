@@ -55,12 +55,11 @@ object MqttNetwork:
       OptionT(F.get(name))
         .subflatMap(parse)
         .getOrElseF(Concurrent[F].raiseError(InvalidConfiguration(s"Env $name is required and must be valid")))
-    val nn = for
+    for
       (host, port) <- Resource.eval:
         (env("MQTT_BROKER_HOST", Host.fromString), env("MQTT_BROKER_PORT", Port.fromString)).parTupled
       network <- make(config, TransportConfig(host, port), SessionConfig(config.clientId, cleanSession = false))
     yield network
-    nn
 
   def localBroker[F[_]: {Concurrent, Temporal, Fs2Network, Console, NetworkMonitor}, LP <: Peer: PeerTag](
       config: Configuration,
@@ -120,10 +119,10 @@ object MqttNetwork:
 
     def handleIncomingMessage: F[Unit] = session.messages
       .evalMap:
-        case Message(`presenceTopic`, data) => onKeepAliveMsg(data)
-        case Message(`inMsgsTopic`, data) => onApplicationMsg(data)
+        case Message(`presenceTopic`, data)                   => onKeepAliveMsg(data)
+        case Message(`inMsgsTopic`, data)                     => onApplicationMsg(data)
         case Message(`startTopic`, data) if data.isStartToken => started.complete(()).void
-        case _ => F.unit
+        case _                                                => F.unit
       .compile
       .drain
 
@@ -143,7 +142,7 @@ object MqttNetwork:
         val filtered = peers.filter(_.tag == remotePeerTag)
         NonEmptyList.fromList(filtered.toList) match
           case Some(nel) => nel.pure
-          case None => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
+          case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
 
     override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerId[To]): F[Unit] =
       for

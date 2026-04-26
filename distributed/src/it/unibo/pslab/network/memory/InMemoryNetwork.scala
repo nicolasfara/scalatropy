@@ -54,16 +54,14 @@ object InMemoryNetwork:
       knownPeers: NonEmptyList[PeerId],
       messagesDispatcher: MessagesDispatcher[F],
   ): Resource[F, InMemoryNetwork[F, LP]] =
-    Resource.make
-      (
-        for
-          incomingMsgs <- Ref.of(IncomingMessages.empty[F, PeerId])
-          localAddress = PeerId(localPeerTag, localId)
-          network = new InMemoryNetworkImpl(localAddress, knownPeers, messagesDispatcher, incomingMsgs)
-          _ <- messagesDispatcher.register(localAddress, network.asHandle)
-        yield network,
-      )
-      (network => messagesDispatcher.unregister(network.local))
+    Resource.make(acquire =
+      for
+        incomingMsgs <- Ref.of(IncomingMessages.empty[F, PeerId])
+        localAddress = PeerId(localPeerTag, localId)
+        network = new InMemoryNetworkImpl(localAddress, knownPeers, messagesDispatcher, incomingMsgs)
+        _ <- messagesDispatcher.register(localAddress, network.asHandle)
+      yield network,
+    )(release = network => messagesDispatcher.unregister(network.local))
 
   private class InMemoryNetworkImpl[F[_]: {Concurrent, NetworkMonitor}, LP <: Peer: PeerTag](
       override val local: PeerId,

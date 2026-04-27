@@ -1,7 +1,8 @@
 package it.unibo.pslab.matmul
 
-import upickle.default.ReadWriter
 import scala.util.Random
+
+import upickle.default.ReadWriter
 
 case class Matrix[T](values: List[List[T]]) derives ReadWriter:
   val rows: Int = values.length

@@ -1,16 +1,17 @@
 package it.unibo.pslab.matmul
 
-import cats.data.NonEmptyList
-import cats.effect.{ ExitCode, IO, IOApp, Resource }
-import cats.syntax.all.*
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.network.NetworkMonitor.withCsvMonitoring
 import it.unibo.pslab.network.memory.InMemoryNetwork
 
+import cats.data.NonEmptyList
+import cats.effect.{ ExitCode, IO, IOApp, Resource }
+import cats.syntax.all.*
+
 /*
  * These two main objects run the evaluation of the matmul implementation using both the selective and the broadcasting
  * communication styles.
- * 
+ *
  * They are implemented to be run with the in-memory network in order to be able to run a high number of workers
  * without the overhead of spawning multiple JVMs and IO Apps.
  */
@@ -26,8 +27,8 @@ object MatMulMaster extends IOApp:
       case _ => IO.println("Usage: MatMulMaster <num-workers> <label>").as(ExitCode.Error)
 
   private def runMatMul(numWorkers: Int, label: String): IO[Unit] =
-    val masterAddr = InMemoryNetwork.Address[Master]("master")
-    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.Address[Worker](s"worker-$i")).toList
+    val masterAddr = InMemoryNetwork.PeerId[Master]("master")
+    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.PeerId[Worker](s"worker-$i")).toList
     val allPeerAddrs = NonEmptyList(masterAddr, workerAddrs)
 
     val networksResource = Resource
@@ -58,8 +59,8 @@ object InefficientMatMulMaster extends IOApp:
       case _ => IO.println("Usage: InefficientMatMulMaster <num-workers> <label>").as(ExitCode.Error)
 
   private def runMatMul(numWorkers: Int, label: String): IO[Unit] =
-    val masterAddr = InMemoryNetwork.Address[Master]("master")
-    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.Address[Worker](s"worker-$i")).toList
+    val masterAddr = InMemoryNetwork.PeerId[Master]("master")
+    val workerAddrs = (1 to numWorkers).map(i => InMemoryNetwork.PeerId[Worker](s"worker-$i")).toList
     val allPeers = NonEmptyList(masterAddr, workerAddrs)
 
     val networksResource = Resource

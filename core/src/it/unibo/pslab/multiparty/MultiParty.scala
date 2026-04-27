@@ -1,5 +1,7 @@
 package it.unibo.pslab.multiparty
 
+import scala.compiletime.Erased
+
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.{ Codable, Network }
 import it.unibo.pslab.peers.Peers.*
@@ -9,7 +11,6 @@ import cats.data.NonEmptyList
 import cats.syntax.all.*
 
 import MultiParty.on
-import scala.compiletime.Erased
 
 trait Label[+V] extends Erased
 
@@ -123,7 +124,7 @@ object MultiParty:
       env: Environment[F],
       network: Network[F, P],
   ): MultiParty[F] = new MultiParty[F]:
-    type Remote[P <: Peer] = network.Address[P]
+    type Remote[P <: Peer] = network.PeerId[P]
     opaque type Anisotropic[RP <: Peer, V] = Map[Remote[RP], V]
 
     def on[Local <: Peer](using local: PeerTag[Local])[V](body: Label[Local] ?=> F[V]): F[V on Local] =

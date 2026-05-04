@@ -58,7 +58,7 @@ object BobV2 extends IOApp.Simple:
     MqttNetwork
       .localBroker[IO, Bob](Configuration(appId = "triangle-pingpong"))
       .use: mqttNet =>
-        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Bob]:
+        ScalaTropyV2(pingPongProgram[IO]).projectedOnV2[Bob]:
           tiedTo[Alice] via mqttNet
 
 object AndromedaV2 extends IOApp.Simple:

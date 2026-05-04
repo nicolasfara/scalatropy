@@ -3,6 +3,7 @@ package it.unibo.pslab.deployment
 import it.unibo.pslab.network.{ CommunicationProtocol, NetworkManager }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 import it.unibo.pslab.peers.PeersV2.{ TiedTo, TiedWithComm }
+import scala.quoted.Quotes
 
 /**
  * Type-safe DSL entry point for defining a ScalaTropy program's deployment configuration.
@@ -50,3 +51,16 @@ object Deployment:
         localNetworks = localNetworks + network
 
     def networks: Set[NetworkManager[F, Local, PeerId]] = localNetworks
+
+  def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): Set[String] =
+    import quotes.reflect.*
+    var found = Set.empty[String]
+    new TreeAccumulator[Unit]:
+      def foldTree(acc: Unit, tree: Tree)(owner: Symbol): Unit =
+        tree match
+          case Inlined(_, bindings, body) => foldTree(acc, body)(owner)
+          case Apply(TypeApply(Apply(TypeApply(fun, List(tpt)), _), _), _) if fun.symbol.name == "tiedTo" =>
+            found += tpt.tpe.typeSymbol.name
+          case elem => foldOverTree(acc, tree)(owner)
+    .foldTree((), term)(Symbol.spliceOwner)
+    found.toSet

@@ -6,6 +6,11 @@ import it.unibo.pslab.network.NetworkManager
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.Monad
+import scala.quoted.Expr
+import scala.quoted.Quotes
+import scala.compiletime.summonInline
+import scala.quoted.Type
+import it.unibo.pslab.peers.PeersV2.Quantifier
 
 object ScalaTropyV2:
   export Deployment.*
@@ -38,6 +43,11 @@ object ScalaTropyV2:
   final private class Impl[F[_]: Monad, Result, PeerId[_ <: Peer]](val program: MultiPartyV2[F] ?=> F[Result])
 
   extension [F[_], Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result, PeerId])
+    inline def projectedOnV2[Local <: Peer: PeerTag](
+        inline buildConnections: Deployment.Scope[F, Local, PeerId] ?=> Unit,
+    )(using Monad[F]): F[Result] =
+      ${ projectionCheck[F, Result, Local, PeerId]('trope, 'buildConnections) }
+
     /**
      * Perform the End Point Projection of the ScalaTropy program on a specific peer type.
      *
@@ -63,3 +73,51 @@ object ScalaTropyV2:
       val env = Environment.make[F]
       val language = MultiPartyV2.make(env, networks)
       trope.program(using language)
+
+  private def projectionCheck[F[_]: Type, Result: Type, Local <: Peer: Type, PeerId[_ <: Peer]: Type](
+      trope: Expr[ScalaTropyV2[F, Result, PeerId]],
+      scopeExpr: Expr[Deployment.Scope[F, Local, PeerId] ?=> Unit],
+  )(using quotes: Quotes): Expr[F[Result]] =
+    import quotes.reflect.*
+
+    def flattenAnd(t: TypeRepr): List[TypeRepr] = t match
+      case AndType(l, r) => flattenAnd(l) ++ flattenAnd(r)
+      case t             => List(t)
+
+    def extractTies(tpe: TypeRepr): List[TypeRepr] =
+      tpe.typeSymbol.info match
+        //         tpe lower bound
+        //              v   refinement parent type   Tie lower bound
+        //              v             v                    v
+        case TypeBounds(_, Refinement(_, "Tie", TypeBounds(_, upperBound))) =>
+          flattenAnd(upperBound)
+        case other =>
+          report.errorAndAbort(s"Expected type X <: { type Tie <: ... }, got: ${other.show}")
+
+    def extractCommAndPeer(tpe: TypeRepr): (TypeRepr, TypeRepr) =
+      if !(tpe <:< TypeRepr.of[Quantifier[?, ?]]) then
+        report.errorAndAbort(s"Expected a Quantifier type, got: ${tpe.show}")
+      tpe.typeArgs match
+        // `AppliedType` represents the application of a type constructor, in this case `Quantifier[Comm, Peer]`
+        case appliedType :: Nil =>
+          appliedType.typeArgs match
+            case comm :: peer :: Nil => (comm, peer)
+            case _                   => report.errorAndAbort("Expected a type constructor Quantifier[Comm, Peer].")
+        case _ => report.errorAndAbort("Cannot extract communication protocol.")
+
+    val expectedPeers = extractTies(TypeRepr.of[Local]).map(extractCommAndPeer).map(_._2).map(_.typeSymbol.name).toSet
+    val configuredPeers = Deployment.collectTiedPeers(scopeExpr.asTerm)
+    if expectedPeers != configuredPeers then
+      report.errorAndAbort(
+        s"""Mismatch between expected and configured tied peers!
+        |Expected (from Local's Tie): ${expectedPeers.mkString(", ")}
+        |Configured (from deployment): ${configuredPeers.mkString(", ")}
+        |""".stripMargin,
+      )
+    '{
+      val deployment = Deployment.Scope[F, Local, PeerId]()
+      $scopeExpr(using deployment)
+      val env = Environment.make[F](using summonInline[Monad[F]])
+      val language = MultiPartyV2.make(env, deployment.networks)(using summonInline[Monad[F]])
+      $trope.program(using language)
+    }

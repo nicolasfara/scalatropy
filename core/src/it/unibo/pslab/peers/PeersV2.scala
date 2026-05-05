@@ -13,12 +13,21 @@ object PeersV2:
 
   import Quantifier.*
 
-  // Typed DSL for expressing architecture:
-  // ```scala
-  // via[MQTT toSingle Client] & via[Memory toMultiple Database]
-  // ```
+  /**
+   * Top-level architectural description of the communication links between peer types.
+   *
+   * For example, to express that a peer is tied to single `Client` via `MQTT` and to multiple `Database` via `Memory`,
+   * we can write:
+   * {{{
+   * via[MQTT toSingle Client] & via[Memory toMultiple Database]
+   * }}}
+   */
   type via[Q <: Quantifier[?, ?]] = Q
+
+  /** Encodes a single communication link between two peer types, via a specific communication protocol. */
   infix type toSingle[Comm <: CommunicationProtocol, P <: Peer] = SingleLink[P, Comm]
+
+  /** Encodes a multiple communication link between two peer types, via a specific communication protocol. */
   infix type toMultiple[Comm <: CommunicationProtocol, P <: Peer] = MultipleLink[P, Comm]
 
   // At the moment, let's stick with a single communication protocol (the Sync one)
@@ -43,6 +52,32 @@ object PeersV2:
   private def syntesizeCommProtocolEvidenceImpl[P <: Peer: Type, R <: Peer: Type](using
       quotes: Quotes,
   ): Expr[CommunicationProtocolEvidence[P, R]] =
+    import quotes.reflect.*
+
+    def extractCommsBetween[P1 <: Peer: Type, P2 <: Peer: Type] =
+      extractArchitecturalLinksOf[P1]
+        .filter((_, peer) => peer =:= TypeRepr.of[P2]) // consider only Communication Protocols of P1 and P2
+        .map(_._1)
+
+    val pComms = extractCommsBetween[P, R]
+    val rComms = extractCommsBetween[R, P]
+    if pComms.length > 1 || rComms.length > 1 then
+      report.errorAndAbort("No more than one link can exists between two peer types")
+    else if pComms.head != rComms.head then report.errorAndAbort(s"""Incompatible types:
+      | - ${TypeRepr.of[P].show} has Tie = ${pComms.map(_.show).mkString(" & ")}
+      | but
+      | - ${TypeRepr.of[R].show} has Tie = ${rComms.map(_.show).mkString(" & ")}
+      | no common communication protocol found!
+      """.stripMargin)
+    else if !(pComms.head <:< TypeRepr.of[CommunicationProtocol]) then
+      report.errorAndAbort(s"Extracted type ${pComms.head.show} is not a `CommunicationProtocol`")
+
+    pComms.head.asType match
+      case '[t] => '{ CommProtocolEv[P, R](_.isInstanceOf[t]) }
+
+  private[pslab] def extractArchitecturalLinksOf[P <: Peer: Type](using
+      quotes: Quotes,
+  ): List[(quotes.reflect.TypeRepr, quotes.reflect.TypeRepr)] =
     import quotes.reflect.*
 
     def flattenAnd(t: TypeRepr): List[TypeRepr] = t match
@@ -70,24 +105,4 @@ object PeersV2:
             case _                   => report.errorAndAbort("Expected a type constructor Quantifier[Comm, Peer].")
         case _ => report.errorAndAbort("Cannot extract communication protocol.")
 
-    def extractCommsBetween[P1 <: Peer: Type, P2 <: Peer: Type] =
-      extractTies(TypeRepr.of[P1])
-        .map(extractCommAndPeer)
-        .filter((_, peer) => peer =:= TypeRepr.of[P2]) // consider only Communication Protocols of P1 and P2
-        .map(_._1)
-
-    val pComms = extractCommsBetween[P, R]
-    val rComms = extractCommsBetween[R, P]
-    if pComms.length > 1 || rComms.length > 1 then
-      report.errorAndAbort("No more than one link can exists between two peer types")
-    else if pComms.head != rComms.head then report.errorAndAbort(s"""Incompatible types:
-      | - ${TypeRepr.of[P].show} has Tie = ${pComms.map(_.show).mkString(" & ")}
-      | but
-      | - ${TypeRepr.of[R].show} has Tie = ${rComms.map(_.show).mkString(" & ")}
-      | no common communication protocol found!
-      """.stripMargin)
-    else if !(pComms.head <:< TypeRepr.of[CommunicationProtocol]) then
-      report.errorAndAbort(s"Extracted type ${pComms.head.show} is not a `CommunicationProtocol`")
-
-    pComms.head.asType match
-      case '[t] => '{ CommProtocolEv[P, R](_.isInstanceOf[t]) }
+    extractTies(TypeRepr.of[P]).map(extractCommAndPeer)

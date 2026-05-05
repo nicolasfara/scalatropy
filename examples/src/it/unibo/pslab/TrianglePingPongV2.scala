@@ -58,8 +58,9 @@ object BobV2 extends IOApp.Simple:
     MqttNetwork
       .localBroker[IO, Bob](Configuration(appId = "triangle-pingpong"))
       .use: mqttNet =>
-        ScalaTropyV2(pingPongProgram[IO]).projectedOnV2[Bob]:
+        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Bob]:
           tiedTo[Alice] via mqttNet
+          tiedTo[Andromeda] via mqttNet
 
 object AndromedaV2 extends IOApp.Simple:
   override def run: IO[Unit] =

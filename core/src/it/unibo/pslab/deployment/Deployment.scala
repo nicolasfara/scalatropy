@@ -52,15 +52,15 @@ object Deployment:
 
     def networks: Set[NetworkManager[F, Local, PeerId]] = localNetworks
 
-  def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): Set[String] =
+  def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
     import quotes.reflect.*
-    var found = Set.empty[String]
+    var found = List.empty[String]
     new TreeAccumulator[Unit]:
       def foldTree(acc: Unit, tree: Tree)(owner: Symbol): Unit =
         tree match
           case Inlined(_, bindings, body) => foldTree(acc, body)(owner)
           case Apply(TypeApply(Apply(TypeApply(fun, List(tpt)), _), _), _) if fun.symbol.name == "tiedTo" =>
-            found += tpt.tpe.typeSymbol.name
+            found :+= tpt.tpe.typeSymbol.name
           case elem => foldOverTree(acc, tree)(owner)
     .foldTree((), term)(Symbol.spliceOwner)
-    found.toSet
+    found

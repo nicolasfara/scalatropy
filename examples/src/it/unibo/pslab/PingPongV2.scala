@@ -18,10 +18,13 @@ import cats.effect.std.Console
 import cats.syntax.all.*
 
 import PingPongV2.*
+import it.unibo.pslab.network.memory.InMemoryNetwork
+import it.unibo.pslab.network.Memory
 
 object PingPongV2:
   type Pinger <: { type Tie <: via[IoT toSingle Ponger] }
   type Ponger <: { type Tie <: via[IoT toSingle Pinger] }
+  type AnotherPeer <: { type Tie <: via[IoT toSingle Ponger] & via[IoT toSingle Pinger] }
 
   def pingPongProgram[F[_]: {Monad, Console, Temporal}](using MultiPartyV2[F]): F[Unit] =
     for
@@ -50,10 +53,12 @@ object PingPongV2:
 object PingerV2 extends IOApp.Simple:
   override def run: IO[Unit] =
     MqttNetwork
-      .localBroker[IO, Pinger](Configuration(appId = "pingpong"))
+      .localBroker[IO, AnotherPeer](Configuration(appId = "pingpong"))
       .use: mqttNet =>
-        ScalaTropyV2(pingPongProgram[IO]).projectedOn[Pinger]:
+        val memNet: InMemoryNetwork[IO, AnotherPeer] = ???
+        ScalaTropyV2(pingPongProgram[IO]).projectedOn[AnotherPeer]:
           tiedTo[Ponger] via mqttNet
+          tiedTo[Pinger] via memNet
 
 object PongerV2 extends IOApp.Simple:
   override def run: IO[Unit] =

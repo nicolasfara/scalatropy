@@ -30,7 +30,8 @@ import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
-trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP] with IoT
+trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP] with IoT:
+  type PeerId[P <: Peer] = BaseNetwork.PeerId
 
 object MqttNetwork:
 

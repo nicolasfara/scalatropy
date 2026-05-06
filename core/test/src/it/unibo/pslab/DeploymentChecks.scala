@@ -19,44 +19,48 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
     trait MQTT extends CommunicationProtocol
     trait WebSocket extends CommunicationProtocol
 
-    trait MQTTNetwork[F[_], P <: Peer] extends Network[F, P] with MQTT
-    trait WebSocketNetwork[F[_], P <: Peer] extends Network[F, P] with WebSocket
+    trait MQTTNetwork[F[_], P <: Peer] extends Network[F, P] with MQTT:
+      type PeerId[P <: Peer] = Int
+    trait WebSocketNetwork[F[_], P <: Peer] extends Network[F, P] with WebSocket:
+      type PeerId[P <: Peer] = Int
 
-    type Pinger <: { type Tie <: via[MQTT toSingle Ponger] }
-    type Ponger <: { type Tie <: via[MQTT toSingle Pinger] }
+    type A <: { type Tie <: via[MQTT toSingle B] & via[MQTT toSingle C] }
+    type B <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle C] }
+    type C <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle B] }
 
     def app[F[_]: Monad](using MultiPartyV2[F]): F[Unit] = ???
 
-    val mqttNet: MQTTNetwork[IO, Pinger] = ???
-    val wsNet: WebSocketNetwork[IO, Pinger] = ???
+    val mqttNet: MQTTNetwork[IO, A] = ???
+    val wsNet: WebSocketNetwork[IO, A] = ???
   """
 
   describe("Deployment definition"):
     describe("when is coherent with architectural definition"):
       it("should compile"):
         commonCode + """
-        ScalaTropyV2(app[IO]).projectedOn[Pinger]:
-          tiedTo[Ponger] via mqttNet
+        ScalaTropyV2(app[IO]).projectedOn[A]:
+          tiedTo[B] via mqttNet
+          tiedTo[C] via mqttNet
         """ should compile
 
     describe("when is not coherent with architectural definition"):
       describe("because of wrong communication protocol"):
         it("should not compile"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
-          ScalaTropyV2(app[IO]).projectedOn[Pinger]:
-            tiedTo[Ponger] via wsNet
+          ScalaTropyV2(app[IO]).projectedOn[A]:
+            tiedTo[B] via mqttNet
+            tiedTo[C] via wsNet
           """)
           compileErrors should have size 1
+          println(compileErrors.head.message)
           compileErrors.head.message should include:
-            "Cannot prove that Pinger <:< it.unibo.pslab.peers.PeersV2.TiedWithComm[Ponger, Protocol]"
+            "Cannot prove that A <:< it.unibo.pslab.peers.PeersV2.TiedWithComm[C, Protocol]"
 
       describe("because of wrong tie"):
         it("should not compile"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
-          type AnotherPeer <: { type Tie <: via[MQTT toSingle Pinger] }
-
-          ScalaTropyV2(app[IO]).projectedOn[Pinger]:
-            tiedTo[AnotherPeer] via mqttNet
+          ScalaTropyV2(app[IO]).projectedOn[A]:
+            tiedTo[A] via mqttNet
           """)
           compileErrors should have size 1
           compileErrors.head.message should (
@@ -65,17 +69,29 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
                  |was found for parameter deployment of method tiedTo
                  |""".stripMargin.replaceAll("\\s+", " ")
             and include:
-              "Local  is a type variable with constraint <: it.unibo.pslab.peers.PeersV2.TiedTo[AnotherPeer]"
+              "Local  is a type variable with constraint <: it.unibo.pslab.peers.PeersV2.TiedTo[A]"
           )
 
       describe("because of using a network placed on a peer that is not the local one"):
         it("should not compile"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
-          val mqttNetworkOnAlice: MQTTNetwork[IO, Ponger] = ???
+          val mqttNetworkOnB: MQTTNetwork[IO, B] = ???
 
-          ScalaTropyV2(app[IO]).projectedOn[Pinger]:
-            tiedTo[Ponger] via mqttNetworkOnAlice
+          ScalaTropyV2(app[IO]).projectedOn[A]:
+            tiedTo[B] via mqttNetworkOnB
           """)
           compileErrors should have size 1
           compileErrors.head.message should include:
-            "Required: it.unibo.pslab.network.NetworkManager[cats.effect.IO, Pinger, PeerId]"
+            "Required: it.unibo.pslab.network.NetworkManager[cats.effect.IO, A, PeerId]"
+
+      describe("because of incomplete ties"):
+        it("should not compile"):
+          val compileErrors: List[Error] = typeCheckErrors(commonCode + """
+          ScalaTropyV2(app[IO]).projectedOn[A]:
+            tiedTo[B] via mqttNet
+            // missing tie with C
+          """)
+          println(compileErrors.size)
+          println(compileErrors)
+          // compileErrors should have size 1
+          // compileErrors.head.message should include:

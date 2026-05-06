@@ -1,5 +1,6 @@
 package it.unibo.pslab.peers
 
+import scala.compiletime.Erased
 import scala.quoted.{ Expr, Quotes, Type }
 
 import it.unibo.pslab.network.CommunicationProtocol
@@ -39,19 +40,14 @@ object PeersV2:
   type TiedWithSingle[P <: Peer] = { type Tie <: SingleLink[P, ?] }
   type TiedWithMultiple[P <: Peer] = { type Tie <: MultipleLink[P, ?] }
 
-  sealed trait CommunicationProtocolEvidence[P <: Peer, R <: Peer] extends (CommunicationProtocol => Boolean)
-  private case class CommProtocolEv[P <: Peer, R <: Peer](
-      logic: CommunicationProtocol => Boolean,
-  ) extends CommunicationProtocolEvidence[P, R]:
-    override def apply(protocol: CommunicationProtocol): Boolean = logic(protocol)
+  sealed trait CommunicationProtocolCompliance[P <: Peer, R <: Peer] extends Erased
 
-  inline given syntesizeCommProtocolEvidence[P <: Peer, R <: Peer]: CommunicationProtocolEvidence[P, R] =
+  inline given syntesizeCommProtocolEvidence[P <: Peer, R <: Peer]: CommunicationProtocolCompliance[P, R] =
     ${ syntesizeCommProtocolEvidenceImpl[P, R] }
 
-  @SuppressWarnings(Array("scalafix:DisableSyntax.isInstanceOf"))
   private def syntesizeCommProtocolEvidenceImpl[P <: Peer: Type, R <: Peer: Type](using
       quotes: Quotes,
-  ): Expr[CommunicationProtocolEvidence[P, R]] =
+  ): Expr[CommunicationProtocolCompliance[P, R]] =
     import quotes.reflect.*
 
     def extractCommsBetween[P1 <: Peer: Type, P2 <: Peer: Type] =
@@ -63,17 +59,10 @@ object PeersV2:
     val rComms = extractCommsBetween[R, P]
     if pComms.length > 1 || rComms.length > 1 then
       report.errorAndAbort("No more than one link can exists between two peer types")
-    else if pComms.head != rComms.head then report.errorAndAbort(s"""Incompatible types:
-      | - ${TypeRepr.of[P].show} has Tie = ${pComms.map(_.show).mkString(" & ")}
-      | but
-      | - ${TypeRepr.of[R].show} has Tie = ${rComms.map(_.show).mkString(" & ")}
-      | no common communication protocol found!
-      """.stripMargin)
     else if !(pComms.head <:< TypeRepr.of[CommunicationProtocol]) then
       report.errorAndAbort(s"Extracted type ${pComms.head.show} is not a `CommunicationProtocol`")
 
-    pComms.head.asType match
-      case '[t] => '{ CommProtocolEv[P, R](_.isInstanceOf[t]) }
+    '{ new CommunicationProtocolCompliance[P, R] {} }
 
   private[pslab] def extractArchitecturalLinksOf[P <: Peer: Type](using
       quotes: Quotes,
@@ -89,10 +78,8 @@ object PeersV2:
         //         tpe lower bound
         //              v   refinement parent type   Tie lower bound
         //              v             v                    v
-        case TypeBounds(_, Refinement(_, "Tie", TypeBounds(_, upperBound))) =>
-          flattenAnd(upperBound)
-        case other =>
-          report.errorAndAbort(s"Expected type X <: { type Tie <: ... }, got: ${other.show}")
+        case TypeBounds(_, Refinement(_, "Tie", TypeBounds(_, upperBound))) => flattenAnd(upperBound)
+        case other => report.errorAndAbort(s"Expected type X <: { type Tie <: ... }, got: ${other.show}")
 
     def extractCommAndPeer(tpe: TypeRepr): (TypeRepr, TypeRepr) =
       if !(tpe <:< TypeRepr.of[Quantifier[?, ?]]) then

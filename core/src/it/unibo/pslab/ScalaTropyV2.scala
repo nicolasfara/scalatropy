@@ -74,9 +74,9 @@ object ScalaTropyV2:
       )
     if expectedPeers != configuredPeers.toSet then
       report.errorAndAbort(
-        s"""Mismatch between expected and configured tied peers!
-        |Expected (from Local's Tie): ${expectedPeers.mkString(", ")}
-        |Configured (from deployment): ${configuredPeers.mkString(", ")}
+        s"""Mismatch between expected and configured tied peers:
+        |- Expected (from Local's Tie): ${expectedPeers.mkString(", ")}
+        |- Configured (from deployment): ${configuredPeers.mkString(", ")}
         |""".stripMargin,
       )
     '{

@@ -3,7 +3,7 @@ package it.unibo.pslab.multiparty
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiPartyV2.on
 import it.unibo.pslab.network.{ Codable, NetworkManager }
-import it.unibo.pslab.peers.PeersV2.{ CommunicationProtocolEvidence, Peer, PeerTag, TiedWithMultiple, TiedWithSingle }
+import it.unibo.pslab.peers.PeersV2.{ CommunicationProtocolCompliance, Peer, PeerTag, TiedWithMultiple, TiedWithSingle }
 
 import cats.Monad
 import cats.syntax.all.*
@@ -23,13 +23,13 @@ trait MultiPartyV2[F[_]: Monad]:
   def comm[From <: TiedWithSingle[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[V: Codable[F]](value: V on From): F[V on To]
 
   def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[V: Codable[F]](value: V on From): F[V on To]
 
   def anisotropicMessage[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
@@ -41,13 +41,13 @@ trait MultiPartyV2[F[_]: Monad]:
   def anisotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[V: Codable[F]](value: Anisotropic[To, V] on From): F[V on To]
 
   def coAnisotropicComm[From <: TiedWithSingle[To], To <: TiedWithMultiple[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[V: Codable[F]](value: V on From): F[Anisotropic[From, V] on To]
 
 object MultiPartyV2:
@@ -74,14 +74,14 @@ object MultiPartyV2:
   def comm[From <: TiedWithSingle[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[F[_]](using lang: MultiPartyV2[F])[V: Codable[F]](value: V on From): F[V on To] =
     lang.comm[From, To](value)
 
   def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[F[_], V: Codable[F]](using lang: MultiPartyV2[F])(value: V on From): F[V on To] =
     lang.isotropicComm[From, To](value)
 
@@ -95,21 +95,21 @@ object MultiPartyV2:
   def anisotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[F[_], V: Codable[F]](using lang: MultiPartyV2[F])(value: lang.Anisotropic[To, V] on From): F[V on To] =
     lang.anisotropicComm[From, To](value)
 
   def coAnisotropicComm[From <: TiedWithSingle[To], To <: TiedWithMultiple[From]](using
       PeerTag[From],
       PeerTag[To],
-      CommunicationProtocolEvidence[From, To],
+      CommunicationProtocolCompliance[From, To],
   )[F[_], V: Codable[F]](using lang: MultiPartyV2[F])(value: V on From): F[lang.Anisotropic[From, V] on To] =
     lang.coAnisotropicComm[From, To](value)
 
   // format: off
   def make[F[_]: Monad, P <: Peer: PeerTag, PeerId[_ <: Peer]](
       env: Environment[F],
-      networks: Set[NetworkManager[F, P, PeerId]],
+      networks: Map[PeerTag[?], NetworkManager[F, P, PeerId]],
   ): MultiPartyV2[F] =
     new MultiPartyV2[F]:
       type Remote[P <: Peer] = PeerId[P]
@@ -138,7 +138,7 @@ object MultiPartyV2:
       def comm[From <: TiedWithSingle[To], To <: TiedWithSingle[From]](using
           PeerTag[From],
           PeerTag[To],
-          CommunicationProtocolEvidence[From, To],
+          CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
           val Placement.Local(res, v) = value.runtimeChecked
@@ -157,7 +157,7 @@ object MultiPartyV2:
       def isotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
           PeerTag[From],
           PeerTag[To],
-          CommunicationProtocolEvidence[From, To],
+          CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
           val Placement.Local(res, v) = value.runtimeChecked
@@ -184,7 +184,7 @@ object MultiPartyV2:
       def anisotropicComm[From <: TiedWithMultiple[To], To <: TiedWithSingle[From]](using
           PeerTag[From],
           PeerTag[To],
-          CommunicationProtocolEvidence[From, To],
+          CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: Anisotropic[To, V] on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
           val Placement.Local(res, vMap) = value.runtimeChecked
@@ -205,7 +205,7 @@ object MultiPartyV2:
       def coAnisotropicComm[From <: TiedWithSingle[To], To <: TiedWithMultiple[From]](using
           PeerTag[From],
           PeerTag[To],
-          CommunicationProtocolEvidence[From, To],
+          CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[Anisotropic[From, V] on To] =
         foldRuntimePeer(ifLocal = network =>
           val Placement.Local(res, v) = value.runtimeChecked
@@ -223,13 +223,12 @@ object MultiPartyV2:
 
       private type Handler[Result] = NetworkManager[F, P, PeerId] => F[Result]
 
-      def foldRuntimePeer[From <: Peer: PeerTag as localPeer, To <: Peer: PeerTag as remotePeer](using
-          matchingProtocol: CommunicationProtocolEvidence[From, To],
+      def foldRuntimePeer[From <: Peer: PeerTag as sourcePeer, To <: Peer: PeerTag as targetPeer](using
+          matchingProtocol: CommunicationProtocolCompliance[From, To],
       )[Result](ifLocal: Handler[Result])(ifRemote: Handler[Result])(default: => F[Result]): F[Result] =
-        val network = networks
-          .find(matchingProtocol)
-          .getOrElse:
-            throw RuntimeException(s"No network for $localPeer and $remotePeer. This should not happen. Please report.")
-        if runtimePeer == localPeer then ifLocal(network)
-        else if runtimePeer == remotePeer then ifRemote(network)
+        val remotePeer = if runtimePeer == sourcePeer then targetPeer else sourcePeer
+        lazy val error = () =>
+          throw RuntimeException(s"No network found for ${remotePeer}. This should not happen. Report this.")
+        if runtimePeer == sourcePeer then ifLocal(networks.getOrElse(remotePeer, error()))
+        else if runtimePeer == targetPeer then ifRemote(networks.getOrElse(sourcePeer, error()))
         else default

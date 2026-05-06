@@ -23,7 +23,7 @@ object Deployment:
    *   All network protocols must encode peer identifiers using the same [[PeerId]] type constructor.
    */
   class Scope[F[_], Local <: Peer, PeerId[_ <: Peer]]:
-    private var localNetworks: Set[NetworkManager[F, Local, PeerId]] = Set()
+    private var localNetworks: Map[PeerTag[?], NetworkManager[F, Local, PeerId]] = Map()
 
     opaque type Connection[Remote <: Peer] = PeerTag[Remote]
 
@@ -31,11 +31,11 @@ object Deployment:
      * Define a connection between the local projected peer and a remote peer type which is tied to by the architectural
      * specification.
      */
-    def tiedTo[Remote <: Peer](using
+    def tiedTo[Remote <: Peer: PeerTag](using
         remoteTag: PeerTag[Remote],
     )(using Local <:< TiedTo[Remote]): Connection[Remote] = remoteTag
 
-    extension [Remote <: Peer](rc: Connection[Remote])
+    extension [Remote <: Peer: PeerTag as remoteTag](rc: Connection[Remote])
 
       /**
        * Binds a network protocol to the connection between the locally projected peer and the remote peer type
@@ -48,9 +48,9 @@ object Deployment:
           Protocol >: Net <: CommunicationProtocol,
           Net <: NetworkManager[F, Local, PeerId],
       ](network: Net)(using Local <:< TiedWithComm[Remote, Protocol]): Unit =
-        localNetworks = localNetworks + network
+        localNetworks = localNetworks + (remoteTag -> network)
 
-    def networks: Set[NetworkManager[F, Local, PeerId]] = localNetworks
+    def networks: Map[PeerTag[?], NetworkManager[F, Local, PeerId]] = localNetworks
 
   def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
     import quotes.reflect.*

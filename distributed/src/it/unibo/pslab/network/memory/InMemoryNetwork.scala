@@ -19,7 +19,8 @@ import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
 
-trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP] with Memory
+trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP] with Memory:
+  type PeerId[P <: Peer] = BaseNetwork.PeerId
 
 object InMemoryNetwork:
   export BaseNetwork.PeerId

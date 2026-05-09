@@ -1,12 +1,14 @@
 package it.unibo.pslab.kvs
 
 import it.unibo.pslab.ScalaTropy
+import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.{ Label, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
-import it.unibo.pslab.peers.Peers.Quantifier.*
+import it.unibo.pslab.peers.Peers.*
 
 import cats.{ Applicative, Monad }
 import cats.effect.{ IO, IOApp }
@@ -24,9 +26,9 @@ import ModularSyncKeyValueStore.{ Client, Primary, Backup }
  */
 object ModularSyncKeyValueStore:
 
-  type Client <: { type Tie <: Single[Primary] }
-  type Primary <: { type Tie <: Multiple[Backup] & Multiple[Client] }
-  type Backup <: { type Tie <: Single[Primary] }
+  type Client <: { type Tie <: via[AnyProtocol toSingle Primary] }
+  type Primary <: { type Tie <: via[AnyProtocol toMultiple Backup] & via[AnyProtocol toMultiple Client] }
+  type Backup <: { type Tie <: via[AnyProtocol toSingle Primary] }
 
   enum Request derives ReadWriter:
     case Get(key: String)
@@ -60,16 +62,16 @@ object ModularSyncKeyValueStore:
       requestOnClient <- on[Client](waitForRequest)
       requestsOnPrimary <- coAnisotropicComm[Client, Primary](requestOnClient)
       responsesOnPrimary <- on[Primary]:
-        take(primaryHandler) flatMap (_(requestsOnPrimary))
+        take(primaryHandler) >>= (_(requestsOnPrimary))
       putRequests <- on[Primary]:
         takeAll(requestsOnPrimary) map (_.values.collect { case r: Put => r }.toList)
       requestsOnBackups <- isotropicComm[Primary, Backup](putRequests)
       ack <- on[Backup]:
-        take(backupHandler) flatMap (_(requestsOnBackups))
+        take(backupHandler) >>= (_(requestsOnBackups))
       _ <- coAnisotropicComm[Backup, Primary](ack)
       responseOnClient <- anisotropicComm[Primary, Client](responsesOnPrimary)
       _ <- on[Client]:
-        take(responseOnClient) flatMap (response => F.println(s"> $response"))
+        take(responseOnClient) >>= (response => F.println(s"> $response"))
       _ <- kvs(primaryHandler, backupHandler)
     yield ()
 
@@ -117,22 +119,28 @@ object ModularSyncKeyValueStore:
         case Request.Put(key, value) => store.put(key, value).map(_ => Response.Ack)
         case Request.Empty           => Response.Empty.pure
 
+object ModularSyncKeyValueStoreApp extends IOApp.Simple:
+  override def run: IO[Unit] =
+    List(ModularPrimaryNode.run, ModularBackupNode.run, ModularClientNode.run, ModularClientNode.run).parSequence_
+
 object ModularPrimaryNode extends IOApp.Simple:
   override def run: IO[Unit] =
     val net = MqttNetwork.localBroker[IO, Primary](Configuration(appId = "modular-kvs"))
-    ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Primary](using net)
+    net.use: mqttNetwork =>
+      ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Primary]:
+        tiedTo[Backup] via mqttNetwork
+        tiedTo[Client] via mqttNetwork
 
 object ModularBackupNode extends IOApp.Simple:
   override def run: IO[Unit] =
     val net = MqttNetwork.localBroker[IO, Backup](Configuration(appId = "modular-kvs"))
-    ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Backup](using net)
+    net.use: mqttNetwork =>
+      ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Backup]:
+        tiedTo[Primary] via mqttNetwork
 
-object ModularClient1Node extends IOApp.Simple:
+object ModularClientNode extends IOApp.Simple:
   override def run: IO[Unit] =
     val net = MqttNetwork.localBroker[IO, Client](Configuration(appId = "modular-kvs"))
-    ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Client](using net)
-
-object ModularClient2Node extends IOApp.Simple:
-  override def run: IO[Unit] =
-    val net = MqttNetwork.localBroker[IO, Client](Configuration(appId = "modular-kvs"))
-    ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Client](using net)
+    net.use: mqttNetwork =>
+      ScalaTropy(ModularSyncKeyValueStore.choreo[IO]).projectedOn[Client]:
+        tiedTo[Primary] via mqttNetwork

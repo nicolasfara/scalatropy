@@ -1,5 +1,9 @@
 package it.unibo.pslab.network
 
-trait IoT extends CommunicationProtocol
+type AnyProtocol = CommunicationProtocol
+
+trait MQTT extends CommunicationProtocol
+
+trait WS extends CommunicationProtocol
 
 trait Memory extends CommunicationProtocol

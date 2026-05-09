@@ -10,8 +10,8 @@ import it.unibo.pslab.network.{
   NetworkError,
   NetworkMonitor,
   NoSuchPeers,
-  PeerRef,
   PeerId,
+  PeerRef,
 }
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }

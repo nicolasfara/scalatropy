@@ -1,15 +1,16 @@
 package it.unibo.pslab
 
+import scala.compiletime.testing.{ typeCheckErrors, Error }
+
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should
-import scala.compiletime.testing.{ Error, typeCheckErrors }
 
-class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
+class MultiPartyArchitecturalChecks extends AnyFunSpec with should.Matchers:
 
   inline val commonImports = """
-    import _root_.it.unibo.pslab.peers.PeersV2.*
-    import _root_.it.unibo.pslab.multiparty.MultiPartyV2
-    import _root_.it.unibo.pslab.multiparty.MultiPartyV2.*
+    import _root_.it.unibo.pslab.peers.Peers.*
+    import _root_.it.unibo.pslab.multiparty.MultiParty
+    import _root_.it.unibo.pslab.multiparty.MultiParty.*
     import _root_.it.unibo.pslab.network.{ CommunicationProtocol, Codable }
 
     import cats.Monad
@@ -26,7 +27,7 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
         type Client <: { type Tie <: via[MQTT toSingle Server] }
         type Server <: { type Tie <: via[MQTT toSingle Client] }
 
-        def example[F[_]: Monad](using MultiPartyV2[F], Codable[F][String]) =
+        def example[F[_]: Monad](using MultiParty[F], Codable[F][String]) =
           for
             v <- on[Client]("Hello, Server!".pure)
             _ <- comm[Client, Server](v)
@@ -39,7 +40,7 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
         type Server <: { type Tie <: via[MQTT toSingle Client] & via[Memory toMultiple Database] }
         type Database <: { type Tie <: via[Memory toMultiple Server] }
         
-        def example[F[_]: Monad](using MultiPartyV2[F], Codable[F][String]) =
+        def example[F[_]: Monad](using MultiParty[F], Codable[F][String]) =
           for
             v <- on[Client]("Hello, Server!".pure)
             _ <- comm[Client, Server](v)
@@ -52,7 +53,7 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
           type Client <: { type Tie <: via[MQTT toSingle Server] }
           type Server <: { type Tie <: via[MQTT toMultiple Client] }
         
-          def example[F[_]: Monad](using MultiPartyV2[F], Codable[F][String]) =
+          def example[F[_]: Monad](using MultiParty[F], Codable[F][String]) =
             for
               v <- on[Client]("Hello, Server!".pure)
               _ <- comm[Client, Server](v)
@@ -60,7 +61,7 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
         """)
         compileErrors should have size 1
         compileErrors.head.message should include:
-          "Server does not conform to upper bound it.unibo.pslab.peers.PeersV2.TiedWithSingle[Client]"
+          "Server does not conform to upper bound it.unibo.pslab.peers.Peers.TiedWithSingle[Client]"
 
     describe("when multiple links between two peer types exists"):
       it("should not compile"):
@@ -68,7 +69,7 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
           type Client <: { type Tie <: via[MQTT toSingle Server] }
           type Server <: { type Tie <: via[Memory toSingle Client] & via[MQTT toSingle Client] }
           
-          def example[F[_]: Monad](using MultiPartyV2[F], Codable[F][String]) =
+          def example[F[_]: Monad](using MultiParty[F], Codable[F][String]) =
             for
               v <- on[Client]("Hello, Server!".pure)
               _ <- comm[Client, Server](v)

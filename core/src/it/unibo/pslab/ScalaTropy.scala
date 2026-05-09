@@ -1,38 +1,59 @@
 package it.unibo.pslab
 
+import it.unibo.pslab.deployment.Deployment
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
-import it.unibo.pslab.network.Network
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
-import cats.{ Monad, Parallel }
-import cats.effect.kernel.{ MonadCancel, Resource }
-import cats.syntax.parallel.*
+import cats.Monad
 
 object ScalaTropy:
+  export Deployment.*
 
-  opaque type ScalaTropy[F[_], Result] = Impl[F, Result]
+  opaque type ScalaTropyV2[F[_], Result] = Impl[F, Result]
 
-  def apply[F[_]: Monad, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropy[F, Result] = Impl(program)
+  /**
+   * The main entry point for ScalaTropy program instantiation and interpretation. Use this method to create a
+   * ScalaTropy program, and then project it on a specific peer type, providing the necessary connections with other
+   * peer types, as per the architecture of the program.
+   *
+   * For example:
+   *
+   * {{{
+   * ScalaTropyV2(mainProgram[IO]).projectedOn[PeerA]:
+   *   tiedTo[PeerB] via IoTNetwork
+   *   tiedTo[PeerC] via wsNetwork
+   *   // other connections
+   * }}}
+   *
+   * @param program
+   *   the program to instantiate.
+   * @return
+   *   a value that can be projected on a specific peer, given an appropriate deployment strategy.
+   */
+  def apply[F[_]: Monad, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropyV2[F, Result] = Impl(program)
 
-  extension [F[_], Result](trope: ScalaTropy[F, Result])
-    def projectedOn[Local <: Peer: PeerTag](using
-        networkRes: Resource[F, Network[F, Local]],
-    )(using MonadCancel[F, Throwable]): F[Result] =
-      networkRes.use(projection)
+  final private class Impl[F[_]: Monad, Result](val program: MultiParty[F] ?=> F[Result])
 
-    def projectedOn[Local <: Peer: PeerTag](using
-        network: Network[F, Local],
+  extension [F[_], Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result])
+
+    /**
+     * Perform the End Point Projection of the ScalaTropy program on a specific peer type.
+     *
+     * @param Local
+     *   the local peer type to project on.
+     * @param buildConnections
+     *   the scope in which to define the connections between the local projected peer and other peer types
+     * @see
+     *   [[Deployment]] for the DSL syntax to define the connections and the network protocol
+     * @return
+     *   an effect that, when evaluated, yields the result of the program on the local peer
+     */
+    inline def projectedOn[Local <: Peer: PeerTag](
+        inline buildConnections: Deployment.Builder[F, Local, PeerId],
     )(using Monad[F]): F[Result] =
-      projection[Local](network)
-
-    def projectedOnMultiple[Local <: Peer: PeerTag](using
-        networks: List[Network[F, Local]],
-    )(using Monad[F], Parallel[F]): F[List[Result]] =
-      networks.parTraverse(projection)
-
-    private inline def projection[Local <: Peer: PeerTag](network: Network[F, Local])(using Monad[F]): F[Result] =
+      Deployment.validate(buildConnections)
+      val deployment = Deployment.Scope[F, Local, PeerId]()
+      buildConnections(using deployment)
       val env = Environment.make[F]
-      given MultiParty[F] = MultiParty.make(env, network)
-      trope.program
-
-  private class Impl[F[_]: Monad, Result](val program: MultiParty[F] ?=> F[Result])
+      val language = MultiParty.make(env, deployment.networks)
+      trope.program(using language)

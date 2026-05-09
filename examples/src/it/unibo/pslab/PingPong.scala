@@ -2,12 +2,14 @@ package it.unibo.pslab
 
 import scala.concurrent.duration.DurationInt
 
+import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
-import it.unibo.pslab.peers.Peers.Quantifier.*
+import it.unibo.pslab.peers.Peers.*
 
 import cats.Monad
 import cats.effect.{ IO, IOApp }
@@ -18,8 +20,8 @@ import cats.syntax.all.*
 import PingPong.*
 
 object PingPong:
-  type Pinger <: { type Tie <: Single[Ponger] }
-  type Ponger <: { type Tie <: Single[Pinger] }
+  type Pinger <: { type Tie <: via[AnyProtocol toSingle Ponger] }
+  type Ponger <: { type Tie <: via[AnyProtocol toSingle Pinger] }
 
   def pingPongProgram[F[_]: {Monad, Console, Temporal}](using MultiParty[F]): F[Unit] =
     for
@@ -45,12 +47,21 @@ object PingPong:
       _ <- pingPong(result)
     yield ()
 
+object PingPongApp extends IOApp.Simple:
+  override def run: IO[Unit] = List(Pinger.run, Ponger.run).parSequence_
+
 object Pinger extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Pinger](Configuration(appId = "pingpong"))
-    ScalaTropy(pingPongProgram[IO]).projectedOn[Pinger](using mqttNetwork)
+    MqttNetwork
+      .localBroker[IO, Pinger](Configuration(appId = "pingpong"))
+      .use: mqttNet =>
+        ScalaTropy(pingPongProgram[IO]).projectedOn[Pinger]:
+          tiedTo[Ponger] via mqttNet
 
 object Ponger extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Ponger](Configuration(appId = "pingpong"))
-    ScalaTropy(pingPongProgram[IO]).projectedOn[Ponger](using mqttNetwork)
+    MqttNetwork
+      .localBroker[IO, Ponger](Configuration(appId = "pingpong"))
+      .use: mqttNet =>
+        ScalaTropy(pingPongProgram[IO]).projectedOn[Ponger]:
+          tiedTo[Pinger] via mqttNet

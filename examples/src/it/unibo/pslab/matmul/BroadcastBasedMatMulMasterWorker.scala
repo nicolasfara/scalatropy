@@ -1,14 +1,21 @@
 package it.unibo.pslab.matmul
 
+import it.unibo.pslab.ScalaTropy
+import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.matmul.{ Matrix, Vec, VecChunk }
 import it.unibo.pslab.matmul.LinearAlgebra.*
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
-import it.unibo.pslab.peers.Peers.Quantifier.*
+import it.unibo.pslab.network.AnyProtocol
+import it.unibo.pslab.network.NetworkMonitor.withCsvMonitoring
+import it.unibo.pslab.network.mqtt.MqttNetwork
+import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
+import it.unibo.pslab.peers.Peers.*
 
 import cats.{ Monad, MonadThrow }
 import cats.data.NonEmptyList
+import cats.effect.{ ExitCode, IO, IOApp }
 import cats.effect.std.Console
 import cats.syntax.all.*
 import upickle.default.ReadWriter
@@ -16,8 +23,8 @@ import upickle.default.ReadWriter
 import BroadcastBasedMatMulMasterWorker.*
 
 object BroadcastBasedMatMulMasterWorker:
-  type Master <: { type Tie <: Multiple[Worker] }
-  type Worker <: { type Tie <: Single[Master] }
+  type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }
+  type Worker <: { type Tie <: via[AnyProtocol toSingle Master] }
 
   case class PartialResult(chunk: VecChunk[Double]) derives ReadWriter
 
@@ -74,3 +81,27 @@ object BroadcastBasedMatMulMasterWorker:
           .toList
           .toMap
           .pure
+
+object InefficientMatMulApp extends IOApp:
+
+  override def run(args: List[String]): IO[ExitCode] =
+    args match
+      case List(numWorkersStr, label) =>
+        val numWorkers = numWorkersStr.toInt
+        val choreo = master(label) +: List.fill(numWorkers)(worker)
+        choreo.parSequence_.as(ExitCode.Success)
+      case _ => IO.println("Usage: MatMulMaster <num-workers> <label>").as(ExitCode.Error)
+
+  def master(label: String): IO[Unit] =
+    withCsvMonitoring(s"evaluation/broadcasting-experiment-$label.csv"):
+      MqttNetwork.fromEnv[IO, Master](Configuration(appId = "matmul"))
+    .use: mqttNet =>
+      ScalaTropy(matmul[IO]).projectedOn[Master]:
+        tiedTo[Worker] via mqttNet
+
+  def worker: IO[Unit] =
+    MqttNetwork
+      .fromEnv[IO, Worker](Configuration(appId = "matmul"))
+      .use: mqttNet =>
+        ScalaTropy(matmul[IO]).projectedOn[Worker]:
+          tiedTo[Master] via mqttNet

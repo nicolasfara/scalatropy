@@ -3,8 +3,7 @@ package it.unibo.pslab.deployment
 import scala.quoted.{ Expr, Quotes, Type }
 
 import it.unibo.pslab.network.{ CommunicationProtocol, Network }
-import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
-import it.unibo.pslab.peers.PeersV2.{ extractArchitecturalLinksOf, TiedTo, TiedWithComm }
+import it.unibo.pslab.peers.Peers.{ extractArchitecturalLinksOf, Peer, PeerTag, TiedTo, TiedWithComm }
 
 /**
  * Type-safe DSL entry point for defining a ScalaTropy program's deployment configuration.
@@ -78,7 +77,7 @@ object Deployment:
     if expectedPeers != configuredPeers.toSet then
       report.errorAndAbort(
         s"""|Mismatch between expected and configured tied peers:
-            |- Expected (from Local's Tie): ${expectedPeers.mkString(", ")}
+            |- Expected (from architecture): ${expectedPeers.mkString(", ")}
             |- Configured (from deployment): ${configuredPeers.mkString(", ")}
             |""".stripMargin,
       )

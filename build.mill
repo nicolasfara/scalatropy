@@ -17,7 +17,7 @@ trait CommonScala extends ScalaModule with ScalafixModule {
 
   def scalacOptions = Seq(
     "-Werror",
-    "-rewrite",
+    // "-rewrite",
     "-indent",
     "-unchecked",
     "-explain",

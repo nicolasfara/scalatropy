@@ -9,13 +9,13 @@ import it.unibo.pslab.network.{
   BaseNetwork,
   Decodable,
   Encodable,
-  IoT,
+  MQTT,
   Network,
   NetworkError,
   NetworkMonitor,
   NoSuchPeers,
-  PeerRef,
   PeerId,
+  PeerRef,
 }
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
@@ -32,14 +32,14 @@ import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
-trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef] with IoT
+trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef] with MQTT
 
 object MqttNetwork:
 
   case class Configuration(
       appId: String,
       clientId: String = s"pslab-${UUID.randomUUID()}",
-      initialWaitWindow: FiniteDuration = 7.seconds,
+      initialWaitWindow: FiniteDuration = 5.seconds,
       keepAliveInterval: FiniteDuration = 250.millis,
   )
 

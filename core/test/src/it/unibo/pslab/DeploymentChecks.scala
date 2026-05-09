@@ -19,10 +19,8 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
     trait MQTT extends CommunicationProtocol
     trait WebSocket extends CommunicationProtocol
 
-    trait MQTTNetwork[F[_], P <: Peer] extends Network[F, P] with MQTT:
-      type PeerId[P <: Peer] = Int
-    trait WebSocketNetwork[F[_], P <: Peer] extends Network[F, P] with WebSocket:
-      type PeerId[P <: Peer] = Int
+    trait MQTTNetwork[F[_], P <: Peer] extends Network[F, P, [_ <: Peer] =>> Int] with MQTT
+    trait WebSocketNetwork[F[_], P <: Peer] extends Network[F, P, [_ <: Peer] =>> Int] with WebSocket
 
     type A <: { type Tie <: via[MQTT toSingle B] & via[MQTT toSingle C] }
     type B <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle C] }
@@ -79,10 +77,11 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
 
           ScalaTropyV2(app[IO]).projectedOn[A]:
             tiedTo[B] via mqttNetworkOnB
+            tiedTo[C] via mqttNet
           """)
           compileErrors should have size 1
           compileErrors.head.message should include:
-            "Required: it.unibo.pslab.network.NetworkManager[cats.effect.IO, A, PeerId]"
+            "Required: it.unibo.pslab.network.Network[cats.effect.IO, A"
 
       describe("because of incomplete ties"):
         it("should not compile"):
@@ -91,7 +90,6 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
             tiedTo[B] via mqttNet
             // missing tie with C
           """)
-          println(compileErrors.size)
-          println(compileErrors)
-          // compileErrors should have size 1
-          // compileErrors.head.message should include:
+          compileErrors should have size 1
+          compileErrors.head.message should include:
+            "Mismatch between expected and configured tied peers"

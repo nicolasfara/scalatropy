@@ -10,8 +10,10 @@ import it.unibo.pslab.network.{
   NetworkError,
   NetworkMonitor,
   NoSuchPeers,
+  PeerRef,
+  PeerId,
 }
-import it.unibo.pslab.network.BaseNetwork.{ IncomingMessages, PeerId }
+import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.data.NonEmptyList
@@ -19,13 +21,9 @@ import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
 
-trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP] with Memory:
-  type PeerId[P <: Peer] = BaseNetwork.PeerId
+trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef] with Memory
 
 object InMemoryNetwork:
-  export BaseNetwork.PeerId
-  export BaseNetwork.PeerId.*
-
   case class NetworkNotRegistered(peerId: PeerId) extends NetworkError(s"$peerId not registered in dispatcher")
 
   trait MessagesDispatcher[F[_]]:
@@ -72,7 +70,7 @@ object InMemoryNetwork:
   ) extends InMemoryNetwork[F, LP]
       with BaseNetwork[F, LP]:
 
-    override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[BaseNetwork.PeerId]] =
+    override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[PeerRef[RP]]] =
       val filtered = knownPeers.toList.filter(_.tag == remotePeerTag)
       NonEmptyList.fromList(filtered) match
         case Some(nel) => nel.pure[F]
@@ -81,18 +79,18 @@ object InMemoryNetwork:
     override def send[V: Encodable[F], To <: Peer: PeerTag](
         value: V,
         resource: Reference,
-        to: BaseNetwork.PeerId,
+        to: PeerRef[To],
     ): F[Unit] =
       for
         encodedValue <- encodeAndTrack(value)
         _ <- messagesDispatcher.route(encodedValue, resource, local, to)
       yield ()
 
-    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: BaseNetwork.PeerId): F[V] =
+    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: PeerRef[From]): F[V] =
       receiveImpl(resource, from)
 
     def asHandle: NetworkHandle[F] = new NetworkHandle[F]:
-      override def deliver(payload: Array[Byte], resource: Reference, from: BaseNetwork.PeerId): F[Unit] =
+      override def deliver(payload: Array[Byte], resource: Reference, from: PeerId): F[Unit] =
         for
           existing <- takePeerMsgOrDefer((from, resource))
           _ <- existing.complete(payload)

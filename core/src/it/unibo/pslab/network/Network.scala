@@ -16,9 +16,7 @@ trait CommunicationProtocol
  * The Network layer, implementing a [[CommunicationProtocol]], abstracting the underlying communication mechanism and
  * providing a uniform interface for sending and receiving messages between peers
  */
-trait Network[F[_], Local <: Peer] extends CommunicationProtocol:
-  type PeerId[P <: Peer]
-
+trait Network[F[_], Local <: Peer, PeerId[P <: Peer]] extends CommunicationProtocol:
   val local: PeerId[Local]
 
   def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerId[To]): F[Unit]
@@ -30,7 +28,3 @@ trait Network[F[_], Local <: Peer] extends CommunicationProtocol:
    *   a [[NonEmptyList]] with all the reachable peers of type [[RP]].
    */
   def alivePeersOf[RP <: Peer: PeerTag]: F[NonEmptyList[PeerId[RP]]]
-
-type NetworkManager[F[_], Local <: Peer, Id[_ <: Peer]] = Network[F, Local] & {
-  type PeerId[P <: Peer] = Id[P]
-}

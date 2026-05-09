@@ -2,7 +2,7 @@ package it.unibo.pslab.multiparty
 
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiPartyV2.on
-import it.unibo.pslab.network.{ Codable, NetworkManager }
+import it.unibo.pslab.network.{ Codable, Network }
 import it.unibo.pslab.peers.PeersV2.{ CommunicationProtocolCompliance, Peer, PeerTag, TiedWithMultiple, TiedWithSingle }
 
 import cats.Monad
@@ -57,7 +57,7 @@ object MultiPartyV2:
     case Local(override val res: Reference, value: V) extends Placement[V, P](res)
     case Remote(override val res: Reference) extends Placement[V, P](res)
 
-  def apply[F[_]: MultiParty as mp]: MultiParty[F] = mp
+  def apply[F[_]: MultiPartyV2 as mp]: MultiPartyV2[F] = mp
 
   def on[Local <: Peer](using
       PeerTag[Local],
@@ -109,7 +109,7 @@ object MultiPartyV2:
   // format: off
   def make[F[_]: Monad, P <: Peer: PeerTag, PeerId[_ <: Peer]](
       env: Environment[F],
-      networks: Map[PeerTag[?], NetworkManager[F, P, PeerId]],
+      networks: Map[PeerTag[?], Network[F, P, PeerId]],
   ): MultiPartyV2[F] =
     new MultiPartyV2[F]:
       type Remote[P <: Peer] = PeerId[P]
@@ -221,7 +221,7 @@ object MultiPartyV2:
           yield Placement.Local(res, values.toMap),
         )(default = Placement.Remote(value.res).pure)
 
-      private type Handler[Result] = NetworkManager[F, P, PeerId] => F[Result]
+      private type Handler[Result] = Network[F, P, PeerId] => F[Result]
 
       def foldRuntimePeer[From <: Peer: PeerTag as sourcePeer, To <: Peer: PeerTag as targetPeer](using
           matchingProtocol: CommunicationProtocolCompliance[From, To],

@@ -1,12 +1,23 @@
 package it.unibo.pslab.network
 
-import it.unibo.pslab.multiparty.Environment.Reference
+import it.unibo.pslab.multiparty.Environment
 import it.unibo.pslab.network.Codable.{ decode, encode }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.effect.kernel.{ Concurrent, Deferred, Ref }
 import cats.syntax.all.*
-import upickle.ReadWriter
+import upickle.default.ReadWriter
+
+type PeerRef[P <: Peer] = PeerId
+
+/**
+ * A typed reference to a peer, combining a tag that identifies the peer's type at the type level with a string id that
+ * uniquely identifies the instance.
+ */
+case class PeerId(tag: PeerTag[?], id: String) derives ReadWriter
+
+object PeerId:
+  def apply[LP <: Peer: PeerTag as peerTag](id: String) = new PeerRef(peerTag, id)
 
 object BaseNetwork:
   /**
@@ -15,26 +26,19 @@ object BaseNetwork:
    * Maps (peer address, resource reference) pairs to deferreds containing message payloads. This allows for
    * synchronization between senders and receivers, regardless of the order in which they arrive.
    */
-  type IncomingMessages[F[_], PeerId] = Map[(PeerId, Reference), Deferred[F, Array[Byte]]]
+  type IncomingMessages[F[_], Id] = Map[(Id, Environment.Reference), Deferred[F, Array[Byte]]]
 
   object IncomingMessages:
-    def empty[F[_], PeerId]: IncomingMessages[F, PeerId] = Map.empty
-
-  case class PeerId(tag: PeerTag[?], id: String) derives ReadWriter
-
-  object PeerId:
-    def apply[LP <: Peer: PeerTag as peerTag](id: String) = new PeerId(peerTag, id)
+    def empty[F[_], Id]: IncomingMessages[F, Id] = Map.empty
 
 /**
  * Base trait providing common functionality for Network implementations.
  */
-trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor}, LP <: Peer] extends Network[F, LP]:
+trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor}, LP <: Peer] extends Network[F, LP, PeerRef]:
 
-  import BaseNetwork.{ IncomingMessages, PeerId as Id }
+  import BaseNetwork.IncomingMessages
 
-  protected val incomingMsgs: Ref[F, IncomingMessages[F, Id]]
-
-  override type PeerId[P <: Peer] = Id
+  protected val incomingMsgs: Ref[F, IncomingMessages[F, PeerRef[?]]]
 
   /**
    * Retrieves an existing deferred for a message from a specific peer and resource, or creates a new one if it doesn't
@@ -42,7 +46,7 @@ trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor}, LP <: Peer] extends Networ
    * @return
    *   the Deferred that will be completed with the message payload
    */
-  protected def takePeerMsgOrDefer(key: (Id, Reference)): F[Deferred[F, Array[Byte]]] =
+  protected def takePeerMsgOrDefer[P <: Peer](key: (PeerRef[P], Environment.Reference)): F[Deferred[F, Array[Byte]]] =
     for
       d <- Deferred[F, Array[Byte]]
       res <- incomingMsgs.modify: m =>
@@ -57,7 +61,7 @@ trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor}, LP <: Peer] extends Networ
    * @return
    *   the decoded value of type V
    */
-  def receiveImpl[V: Decodable[F]](resource: Reference, from: Id): F[V] =
+  def receiveImpl[From <: Peer, V: Decodable[F]](resource: Environment.Reference, from: PeerRef[From]): F[V] =
     for
       toWaitOn <- takePeerMsgOrDefer((from, resource))
       data <- toWaitOn.get.flatTap(summon[NetworkMonitor[F]].onReceive).flatMap(decode)

@@ -1,16 +1,19 @@
 package it.unibo.pslab.deployment
 
-import it.unibo.pslab.network.{ CommunicationProtocol, NetworkManager }
+import scala.quoted.{ Expr, Quotes, Type }
+
+import it.unibo.pslab.network.{ CommunicationProtocol, Network }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
-import it.unibo.pslab.peers.PeersV2.{ TiedTo, TiedWithComm }
-import scala.quoted.Quotes
+import it.unibo.pslab.peers.PeersV2.{ extractArchitecturalLinksOf, TiedTo, TiedWithComm }
 
 /**
  * Type-safe DSL entry point for defining a ScalaTropy program's deployment configuration.
  */
 object Deployment:
 
-  def tiedTo[Remote <: Peer](using
+  type Builder[F[_], Local <: Peer, PeerId[_ <: Peer]] = Deployment.Scope[F, Local, PeerId] ?=> Unit
+
+  inline def tiedTo[Remote <: Peer](using
       PeerTag[Remote],
   )[F[_], Local <: TiedTo[Remote], PeerId[_ <: Peer]](using
       deployment: Scope[F, Local, PeerId],
@@ -23,7 +26,7 @@ object Deployment:
    *   All network protocols must encode peer identifiers using the same [[PeerId]] type constructor.
    */
   class Scope[F[_], Local <: Peer, PeerId[_ <: Peer]]:
-    private var localNetworks: Map[PeerTag[?], NetworkManager[F, Local, PeerId]] = Map()
+    private var localNetworks: Map[PeerTag[?], Network[F, Local, PeerId]] = Map()
 
     opaque type Connection[Remote <: Peer] = PeerTag[Remote]
 
@@ -46,21 +49,47 @@ object Deployment:
        */
       infix def via[
           Protocol >: Net <: CommunicationProtocol,
-          Net <: NetworkManager[F, Local, PeerId],
+          Net <: Network[F, Local, PeerId],
       ](network: Net)(using Local <:< TiedWithComm[Remote, Protocol]): Unit =
         localNetworks = localNetworks + (remoteTag -> network)
 
-    def networks: Map[PeerTag[?], NetworkManager[F, Local, PeerId]] = localNetworks
+    def networks: Map[PeerTag[?], Network[F, Local, PeerId]] = localNetworks
 
-  def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
+  /**
+   * Compile-time validation of the deployment configuration against the program architecture, ensuring exhaustivity of
+   * connection ties and absence of duplicates.
+   * @param builder
+   *   the deployment configuration to validate
+   */
+  inline def validate[F[_], Local <: Peer, PeerId[_ <: Peer]](inline builder: Builder[F, Local, PeerId]) =
+    ${ validateImpl('builder) }
+
+  private def validateImpl[F[_], Local <: Peer: Type, PeerId[_ <: Peer]](
+      builderExpr: Expr[Builder[F, Local, PeerId]],
+  )(using quotes: Quotes): Expr[Unit] =
     import quotes.reflect.*
-    var found = List.empty[String]
-    new TreeAccumulator[Unit]:
-      def foldTree(acc: Unit, tree: Tree)(owner: Symbol): Unit =
+    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2).map(_.typeSymbol.fullName).toSet
+    val configuredPeers = collectTiedPeers(builderExpr.asTerm)
+    val dupes = configuredPeers.diff(configuredPeers.distinct)
+    if dupes.nonEmpty then
+      report.errorAndAbort(
+        s"Each peer type may only have one connection tie, but duplicates were found: ${dupes.mkString(", ")}",
+      )
+    if expectedPeers != configuredPeers.toSet then
+      report.errorAndAbort(
+        s"""|Mismatch between expected and configured tied peers:
+            |- Expected (from Local's Tie): ${expectedPeers.mkString(", ")}
+            |- Configured (from deployment): ${configuredPeers.mkString(", ")}
+            |""".stripMargin,
+      )
+    '{ () }
+
+  private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
+    import quotes.reflect.*
+    val found = new TreeAccumulator[List[TypeRepr]]:
+      def foldTree(acc: List[TypeRepr], tree: Tree)(owner: Symbol): List[TypeRepr] =
         tree match
-          case Inlined(_, bindings, body) => foldTree(acc, body)(owner)
-          case Apply(TypeApply(Apply(TypeApply(fun, List(tpt)), _), _), _) if fun.symbol.name == "tiedTo" =>
-            found :+= tpt.tpe.typeSymbol.name
-          case elem => foldOverTree(acc, tree)(owner)
-    .foldTree((), term)(Symbol.spliceOwner)
-    found
+          case TypeApply(fun, List(tpt)) if fun.symbol.name == "tiedTo" => acc :+ tpt.tpe
+          case elem                                                     => foldOverTree(acc, tree)(owner)
+    .foldTree(List.empty, term)(Symbol.spliceOwner)
+    found.map(_.typeSymbol.fullName)

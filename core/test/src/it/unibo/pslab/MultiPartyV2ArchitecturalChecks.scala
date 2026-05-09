@@ -62,22 +62,6 @@ class MultiPartyV2ArchitecturalChecks extends AnyFunSpec with should.Matchers:
         compileErrors.head.message should include:
           "Server does not conform to upper bound it.unibo.pslab.peers.PeersV2.TiedWithSingle[Client]"
 
-    describe("when communication protocol are incoherent"):
-      ignore("should not compile"):
-        val compileErrors: List[Error] = typeCheckErrors(commonImports + """
-          type Client <: { type Tie <: via[MQTT toSingle Server] }
-          type Server <: { type Tie <: via[Memory toSingle Client] & via[MQTT toMultiple Database] }
-          type Database <: { type Tie <: via[MQTT toMultiple Server] }
-        
-          def example[F[_]: Monad](using MultiPartyV2[F], Codable[F][String]) =
-            for
-              v <- on[Client]("Hello, Server!".pure)
-              _ <- comm[Client, Server](v)
-            yield ()
-        """)
-        compileErrors should have size 1
-        compileErrors.head.message should include("no common communication protocol found")
-
     describe("when multiple links between two peer types exists"):
       it("should not compile"):
         val compileErrors: List[Error] = typeCheckErrors(commonImports + """

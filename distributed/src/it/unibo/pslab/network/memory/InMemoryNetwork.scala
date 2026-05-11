@@ -21,7 +21,7 @@ import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
 
-trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef] with Memory
+trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], Memory
 
 object InMemoryNetwork:
   case class NetworkNotRegistered(peerId: PeerId) extends NetworkError(s"$peerId not registered in dispatcher")

@@ -32,7 +32,7 @@ import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
-trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef] with MQTT
+trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], MQTT
 
 object MqttNetwork:
 

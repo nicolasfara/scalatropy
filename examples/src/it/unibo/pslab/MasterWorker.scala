@@ -1,11 +1,13 @@
 package it.unibo.pslab
 
+import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
-import it.unibo.pslab.peers.Peers.Quantifier.*
+import it.unibo.pslab.peers.Peers.*
 
 import cats.MonadThrow
 import cats.effect.{ IO, IOApp }
@@ -16,8 +18,8 @@ import upickle.default.ReadWriter
 import MasterWorker.*
 
 object MasterWorker:
-  type Master <: { type Tie <: Multiple[Worker] }
-  type Worker <: { type Tie <: Single[Master] }
+  type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }
+  type Worker <: { type Tie <: via[AnyProtocol toSingle Master] }
 
   case class Task(x: Int) derives ReadWriter:
     def compute: Int = x * x
@@ -46,17 +48,26 @@ object MasterWorker:
         yield ()
     yield ()
 
+object MasterWorkerApp extends IOApp.Simple:
+  override def run: IO[Unit] = List(MasterServer.run, Worker1.run, Worker2.run).parSequence_
+
 object MasterServer extends IOApp.Simple:
   override def run: IO[Unit] =
     val mqttNetwork = MqttNetwork.localBroker[IO, Master](Configuration(appId = "masterworker"))
-    ScalaTropy(masterWorkerProgram[IO]).projectedOn[Master](using mqttNetwork)
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(masterWorkerProgram[IO]).projectedOn[Master]:
+        tiedTo[Worker] via mqtt
 
 object Worker1 extends IOApp.Simple:
   override def run: IO[Unit] =
     val mqttNetwork = MqttNetwork.localBroker[IO, Worker](Configuration(appId = "masterworker"))
-    ScalaTropy(masterWorkerProgram[IO]).projectedOn[Worker](using mqttNetwork)
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(masterWorkerProgram[IO]).projectedOn[Worker]:
+        tiedTo[Master] via mqtt
 
 object Worker2 extends IOApp.Simple:
   override def run: IO[Unit] =
     val mqttNetwork = MqttNetwork.localBroker[IO, Worker](Configuration(appId = "masterworker"))
-    ScalaTropy(masterWorkerProgram[IO]).projectedOn[Worker](using mqttNetwork)
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(masterWorkerProgram[IO]).projectedOn[Worker]:
+        tiedTo[Master] via mqtt

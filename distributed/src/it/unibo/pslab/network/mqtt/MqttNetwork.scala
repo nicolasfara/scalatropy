@@ -9,13 +9,15 @@ import it.unibo.pslab.network.{
   BaseNetwork,
   Decodable,
   Encodable,
-  IoT,
+  MQTT,
   Network,
   NetworkError,
   NetworkMonitor,
   NoSuchPeers,
+  PeerId,
+  PeerRef,
 }
-import it.unibo.pslab.network.BaseNetwork.{ IncomingMessages, PeerId }
+import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.data.{ NonEmptyList, OptionT }
@@ -30,14 +32,14 @@ import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
 
-trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP] with IoT
+trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], MQTT
 
 object MqttNetwork:
 
   case class Configuration(
       appId: String,
       clientId: String = s"pslab-${UUID.randomUUID()}",
-      initialWaitWindow: FiniteDuration = 7.seconds,
+      initialWaitWindow: FiniteDuration = 5.seconds,
       keepAliveInterval: FiniteDuration = 250.millis,
   )
 
@@ -93,8 +95,8 @@ object MqttNetwork:
       networkConfig: Configuration,
       session: Session[F],
       started: Deferred[F, Unit],
-      peers: Ref[F, Set[PeerId]],
-      protected val incomingMsgs: Ref[F, IncomingMessages[F, PeerId]],
+      peers: Ref[F, Set[PeerRef[?]]],
+      protected val incomingMsgs: Ref[F, IncomingMessages[F, PeerRef[?]]],
   ) extends MqttNetwork[F, LP]
       with BaseNetwork[F, LP]:
 
@@ -103,7 +105,7 @@ object MqttNetwork:
     val inMsgsTopic = Topics.inMsgs(networkConfig.appId, localPeerTag, networkConfig.clientId)
     val startToken = "start"
 
-    override val local: PeerId[LP] = PeerId(localPeerTag, networkConfig.clientId)
+    override val local: PeerRef[LP] = PeerId(localPeerTag, networkConfig.clientId)
 
     def publishPresenceUntilStart: F[Unit] =
       val heartbeat = session.publish(presenceTopic, upickle.writeBinary(local), AtLeastOnce)
@@ -128,30 +130,30 @@ object MqttNetwork:
 
     extension (data: Vector[Byte]) def isStartToken: Boolean = upickle.readBinary[String](data.toArray) == startToken
 
-    def onKeepAliveMsg(data: Array[Byte]): F[Unit] = peers.update(_ + upickle.readBinary[PeerId[?]](data))
+    def onKeepAliveMsg(data: Array[Byte]): F[Unit] = peers.update(_ + upickle.readBinary[PeerId](data))
 
     def onApplicationMsg(data: Array[Byte]): F[Unit] =
       for
-        (address, resource, payload) = upickle.readBinary[(PeerId[?], Reference, Array[Byte])](data)
+        (address, resource, payload) = upickle.readBinary[(PeerId, Reference, Array[Byte])](data)
         existing <- takePeerMsgOrDefer((address, resource))
         _ <- existing.complete(payload)
       yield ()
 
-    override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[PeerId[RP]]] =
+    override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[PeerRef[RP]]] =
       peers.get.flatMap: peers =>
         val filtered = peers.filter(_.tag == remotePeerTag)
         NonEmptyList.fromList(filtered.toList) match
           case Some(nel) => nel.pure
           case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
 
-    override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerId[To]): F[Unit] =
+    override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerRef[To]): F[Unit] =
       for
         encodedValue <- encodeAndTrack(value)
         payload = upickle.writeBinary((local, resource, encodedValue))
         _ <- session.publish(Topics.inMsgs(networkConfig.appId, to.tag, to.id), payload, AtLeastOnce)
       yield ()
 
-    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: PeerId[From]): F[V] =
+    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: PeerRef[From]): F[V] =
       receiveImpl(resource, from)
   end MqttNetworkImpl
 

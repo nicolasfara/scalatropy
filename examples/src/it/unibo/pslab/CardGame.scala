@@ -1,13 +1,15 @@
 package it.unibo.pslab
 
-import it.unibo.pslab.ScalaTropyV2.*
+import scala.util.Random
+
+import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
-import it.unibo.pslab.multiparty.MultiPartyV2
-import it.unibo.pslab.multiparty.MultiPartyV2.*
-import it.unibo.pslab.network.IoT
+import it.unibo.pslab.multiparty.MultiParty
+import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
-import it.unibo.pslab.peers.PeersV2.*
+import it.unibo.pslab.peers.Peers.*
 
 import cats.MonadThrow
 import cats.effect.{ IO, IOApp }
@@ -15,12 +17,11 @@ import cats.effect.std.Console
 import cats.syntax.all.*
 import upickle.default.ReadWriter
 
-import CardGameV2.*
-import scala.util.Random
+import CardGame.*
 
-object CardGameV2:
-  type Dealer <: { type Tie <: via[IoT toMultiple Player] }
-  type Player <: { type Tie <: via[IoT toSingle Dealer] }
+object CardGame:
+  type Dealer <: { type Tie <: via[AnyProtocol toMultiple Player] }
+  type Player <: { type Tie <: via[AnyProtocol toSingle Dealer] }
 
   final case class Card(value: Int) derives ReadWriter:
     def +(other: Card): Card = Card.of(value + other.value)
@@ -33,22 +34,26 @@ object CardGameV2:
   final case class HandDeal(initial: Card, second: Option[Card]) derives ReadWriter
   final case class PlayerResult(total: Card, won: Boolean) derives ReadWriter
 
-  def cardGameEntrypoint[F[_]: {MonadThrow, Console}](using MultiPartyV2[F]): F[Unit] =
+  def cardGameEntrypoint[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
     for
-      deck <- on[Dealer]{ Seq.fill(10)(Random.nextInt).toList.pure }
-      choice <- on[Player]:
+      deck <- on[Dealer](Seq.fill(10)(Random.nextInt).toList.pure)
+      choice <- on[Player] {
         val secondCard = Random.nextBoolean()
-        F.println(s"[Player] Do you want a second card? $secondCard").as(secondCard) // For simplicity, we hardcode the choice here
+        F.println(s"[Player] Do you want a second card? $secondCard")
+          .as(secondCard) // For simplicity, we hardcode the choice here
+      }
       _ <- cardGameProgram(deck, choice)
     yield ()
 
   def cardGameProgram[F[_]: {MonadThrow, Console}](
       deck: List[Int] on Dealer,
       wantsSecondCard: Boolean on Player,
-  )(using MultiPartyV2[F]): F[Unit] =
+  )(using MultiParty[F]): F[Unit] =
     for
       _ <- on[Player]:
-        take(wantsSecondCard) >>= { choice => F.println(s"[Player] Chose to ${if choice then "take" else "not take"} a second card") }
+        take(wantsSecondCard) >>= { choice =>
+          F.println(s"[Player] Chose to ${if choice then "take" else "not take"} a second card")
+        }
       choicesOnDealer <- coAnisotropicComm[Player, Dealer](wantsSecondCard)
       dealsOnDealer <- on[Dealer]:
         for
@@ -89,14 +94,18 @@ object CardGameV2:
       tableCard: Card,
   )
 
-  private def dealHands[F[_]](using lang: MultiPartyV2[F])(
+  private def dealHands[F[_]](using
+      lang: MultiParty[F],
+  )(
       deck: List[Int],
       choices: Map[lang.Remote[Player], Boolean],
   ): Allocation[lang.Remote[Player]] =
-    val cards = LazyList.continually(deck match
-      case Nil      => List(0)
-      case nonEmpty => nonEmpty,
-    ).flatten.map(Card.of)
+    val cards = LazyList
+      .continually(deck match
+        case Nil      => List(0)
+        case nonEmpty => nonEmpty)
+      .flatten
+      .map(Card.of)
     var deckIndex = 0
     val orderedPlayers = choices.toList.sortBy(_._1.toString)
     val deals = orderedPlayers.map: (player, wantsSecond) =>
@@ -118,39 +127,30 @@ object LaunchAll extends IOApp.Simple:
       CardGamePlayer3V2.run,
     ).parSequence_
 
-
 object CardGameDealerV2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    MqttNetwork
-      .localBroker[IO, Dealer](Configuration(appId = "cardgame-v2"))
-      .use: mqttNet =>
-        ScalaTropyV2(cardGameEntrypoint[IO])
-          .projectedOn[Dealer]:
-            tiedTo[Player] via mqttNet
+    val mqttNetwork = MqttNetwork.localBroker[IO, Dealer](Configuration(appId = "cardgame-v2"))
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Dealer]:
+        tiedTo[Player] via mqtt
 
 object CardGamePlayer1V2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    MqttNetwork
-      .localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
-      .use: mqttNet =>
-        ScalaTropyV2(cardGameEntrypoint[IO])
-          .projectedOn[Player]:
-            tiedTo[Dealer] via mqttNet
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
+        tiedTo[Dealer] via mqtt
 
 object CardGamePlayer2V2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    MqttNetwork
-      .localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
-      .use: mqttNet =>
-        ScalaTropyV2(cardGameEntrypoint[IO])
-          .projectedOn[Player]:
-            tiedTo[Dealer] via mqttNet
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
+        tiedTo[Dealer] via mqtt
 
 object CardGamePlayer3V2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    MqttNetwork
-      .localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
-      .use: mqttNet =>
-        ScalaTropyV2(cardGameEntrypoint[IO])
-          .projectedOn[Player]:
-            tiedTo[Dealer] via mqttNet
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    mqttNetwork.use: mqtt =>
+      ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
+        tiedTo[Dealer] via mqtt

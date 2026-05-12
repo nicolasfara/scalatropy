@@ -33,7 +33,7 @@ object ExperimentRunner:
     info("Running MatMul Master-Worker program with selective style communications")
     runExperiments(
       maxWorkers,
-      fqClass = s"$basePackage.matmul.MatMulMaster",
+      fqClass = s"$basePackage.matmul.MatMulApp",
       label = "selective experiment",
     )
 
@@ -41,7 +41,7 @@ object ExperimentRunner:
     info("Running MatMul Master-Worker program with broadcasting style communications")
     runExperiments(
       maxWorkers,
-      fqClass = s"$basePackage.matmul.InefficientMatMulMaster",
+      fqClass = s"$basePackage.matmul.InefficientMatMulApp",
       label = "broadcasting (inefficient) experiment",
     )
 

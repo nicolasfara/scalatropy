@@ -23,3 +23,8 @@ services:
       - ./RunExperiments.sc:/app/RunExperiments.sc
       - ./requirements.txt:/app/requirements.txt
       - ./plot_results.py:/app/plot_results.py
+    environment:
+      - MQTT_BROKER_HOST=mosquitto-broker
+      - MQTT_BROKER_PORT=1883
+    depends_on:
+      - mosquitto

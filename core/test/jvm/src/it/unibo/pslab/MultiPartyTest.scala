@@ -38,9 +38,9 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs:
         def testProgram[F[_]: Monad](using MultiParty[F]) =
           var counter = 0
           for
-            _ <- on[Foo] { (counter += 1).pure }
-            _ <- on[Bar] { (counter += 1).pure }
-            _ <- on[Baz] { (counter += 1).pure }
+            _ <- on[Foo]((counter += 1).pure)
+            _ <- on[Bar]((counter += 1).pure)
+            _ <- on[Baz]((counter += 1).pure)
           yield
             counter shouldBe 2
             ()
@@ -59,12 +59,20 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs:
 
         val network = stub[Network[[A] =>> Either[Throwable, A], Bar, PeerRef]]
         (network.alivePeersOf(using _: PeerTag[Baz])).returnsWith(NonEmptyList.of("first").asRight)
-        (network.send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using _: Encodable[[A] =>> Either[Throwable, A]][Int], _: PeerTag[Baz]))
+        (network
+          .send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using
+            _: Encodable[[A] =>> Either[Throwable, A]][Int],
+            _: PeerTag[Baz],
+          ))
           .returnsWith(().asRight)
         ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Bar]:
           tiedTo[Foo] via network
           tiedTo[Baz] via network
 
         // Even if the `isotropicComm` has a sender Foo, Bar is a subtype of Foo, so it should be able to send the message as well.
-        (network.send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using _: Encodable[[A] =>> Either[Throwable, A]][Int], _: PeerTag[Baz]))
+        (network
+          .send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using
+            _: Encodable[[A] =>> Either[Throwable, A]][Int],
+            _: PeerTag[Baz],
+          ))
           .times shouldBe 1

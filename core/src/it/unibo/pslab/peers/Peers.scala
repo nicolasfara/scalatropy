@@ -12,7 +12,7 @@ object Peers:
     def baseTypeRepr: String
     infix def <:<[R <: Peer](base: PeerTag[R]): Boolean
 
-  private final case class PeerReprImpl[-P <: Peer](baseTypeRepr: String, supertypes: List[String]) extends PeerTag[P]:
+  final private case class PeerReprImpl[-P <: Peer](baseTypeRepr: String, supertypes: List[String]) extends PeerTag[P]:
     override def toString: String = s"'$baseTypeRepr'${supertypes.mkString(" <: '", ", ", "'")}"
     override def <:<[R <: Peer](base: PeerTag[R]): Boolean =
       baseTypeRepr == base.baseTypeRepr || supertypes.contains(base.baseTypeRepr)
@@ -24,7 +24,7 @@ object Peers:
 
   inline given syntesizePeerTag[P <: Peer]: PeerTag[P] = ${ peerReprImpl[P] }
 
-  private def peerReprImpl[T <: Peer : Type](using quotes: Quotes): Expr[PeerTag[T]] =
+  private def peerReprImpl[T <: Peer: Type](using quotes: Quotes): Expr[PeerTag[T]] =
     import quotes.reflect.*
 
     def collectBasesOfType(tpe: TypeRepr): List[Symbol] =
@@ -122,7 +122,7 @@ object Peers:
         //              v   refinement parent type   Tie lower bound
         //              v             v                    v
         case TypeBounds(_, Refinement(_, "Tie", TypeBounds(_, upperBound))) => flattenAnd(upperBound)
-        case TypeBounds(_, upperBound) if upperBound <:< TypeRepr.of[Peer] => extractTies(upperBound)
+        case TypeBounds(_, upperBound) if upperBound <:< TypeRepr.of[Peer]  => extractTies(upperBound)
         case other => report.errorAndAbort(s"Expected type X <: { type Tie <: ... }, got: ${other.show}")
 
     def extractCommAndPeer(tpe: TypeRepr): (TypeRepr, TypeRepr) =

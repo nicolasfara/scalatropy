@@ -25,7 +25,7 @@ class PeerTagTest extends AnyFunSpec, should.Matchers:
       val tag2 = syntesizePeerTag[Bar]
       tag1 <:< tag2 shouldBe false
       tag2 <:< tag1 shouldBe false
-    
+
   describe("Two PeerTags"):
     it("should be in a subtype relation if one is a supertype of the other"):
       val tag1 = syntesizePeerTag[Baz]

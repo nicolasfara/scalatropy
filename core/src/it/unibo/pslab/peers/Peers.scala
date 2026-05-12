@@ -8,15 +8,14 @@ import it.unibo.pslab.network.CommunicationProtocol
 import upickle.default.{ readwriter, ReadWriter }
 
 object Peers:
-  sealed trait PeerTag[-P <: Peer]
-
-  extension [P <: Peer](peerRepr: PeerTag[P])
-    def baseTypeRepr: String = peerRepr.asInstanceOf[PeerReprImpl[P]].baseTypeRepr
-    infix def <:<[R <: Peer](base: PeerTag[R]): Boolean =
-      peerRepr.baseTypeRepr == base.baseTypeRepr || peerRepr.asInstanceOf[PeerReprImpl[P]].supertypes.contains(base.baseTypeRepr)
+  sealed trait PeerTag[-P <: Peer]:
+    def baseTypeRepr: String
+    infix def <:<[R <: Peer](base: PeerTag[R]): Boolean
 
   private final case class PeerReprImpl[-P <: Peer](baseTypeRepr: String, supertypes: List[String]) extends PeerTag[P]:
     override def toString: String = s"'$baseTypeRepr'${supertypes.mkString(" <: '", ", ", "'")}"
+    override def <:<[R <: Peer](base: PeerTag[R]): Boolean =
+      baseTypeRepr == base.baseTypeRepr || supertypes.contains(base.baseTypeRepr)
 
   given [P <: Peer] => ReadWriter[PeerTag[P]] = readwriter[(String, List[String])].bimap(
     { case PeerReprImpl(base, superTypes) => (base, superTypes) },

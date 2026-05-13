@@ -65,23 +65,41 @@ object Deployment:
       builderExpr: Expr[Builder[F, Local, PeerId]],
   )(using quotes: Quotes): Expr[Unit] =
     import quotes.reflect.*
-    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2).map(_.typeSymbol.fullName).toSet
+    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2)
     val configuredPeers = collectTiedPeers(builderExpr.asTerm)
-    val dupes = configuredPeers.diff(configuredPeers.distinct)
+    val configuredPeerNames = configuredPeers.map(peerName)
+    val dupes = configuredPeerNames.diff(configuredPeerNames.distinct)
     if dupes.nonEmpty then
       report.errorAndAbort(
         s"Each peer type may only have one connection tie, but duplicates were found: ${dupes.mkString(", ")}",
       )
-    if expectedPeers != configuredPeers.toSet then
+    if !hasExhaustiveSubtypeMatching(expectedPeers, configuredPeers) then
       report.errorAndAbort(
         s"""|Mismatch between expected and configured tied peers:
-            |- Expected (from architecture): ${expectedPeers.mkString(", ")}
-            |- Configured (from deployment): ${configuredPeers.mkString(", ")}
+            |- Expected (from architecture): ${expectedPeers.map(peerName).mkString(", ")}
+            |- Configured (from deployment): ${configuredPeers.map(peerName).mkString(", ")}
             |""".stripMargin,
       )
     '{ () }
 
-  private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
+  private def hasExhaustiveSubtypeMatching(using quotes: Quotes)(
+      expectedPeers: List[quotes.reflect.TypeRepr],
+      configuredPeers: List[quotes.reflect.TypeRepr],
+  ): Boolean =
+    import quotes.reflect.*
+
+    def loop(remainingExpected: List[TypeRepr], remainingConfigured: List[TypeRepr]): Boolean =
+      remainingExpected match
+        case Nil => remainingConfigured.isEmpty
+        case expected :: expectedTail =>
+          remainingConfigured.indices.exists: index =>
+            val configured = remainingConfigured(index)
+            configured <:< expected &&
+              loop(expectedTail, remainingConfigured.patch(index, Nil, 1))
+
+    loop(expectedPeers, configuredPeers)
+
+  private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[quotes.reflect.TypeRepr] =
     import quotes.reflect.*
     val found = new TreeAccumulator[List[TypeRepr]]:
       def foldTree(acc: List[TypeRepr], tree: Tree)(owner: Symbol): List[TypeRepr] =
@@ -89,4 +107,8 @@ object Deployment:
           case TypeApply(fun, List(tpt)) if fun.symbol.name == "tiedTo" => acc :+ tpt.tpe
           case elem                                                     => foldOverTree(acc, tree)(owner)
     .foldTree(List.empty, term)(Symbol.spliceOwner)
-    found.map(_.typeSymbol.fullName)
+    found
+
+  private def peerName(using quotes: Quotes)(peer: quotes.reflect.TypeRepr): String =
+    val name = peer.typeSymbol.fullName
+    if name.nonEmpty then name else peer.show

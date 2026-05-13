@@ -25,6 +25,7 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
     type A <: { type Tie <: via[MQTT toSingle B] & via[MQTT toSingle C] }
     type B <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle C] }
     type C <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle B] }
+    type D <: B
 
     def app[F[_]: Monad](using MultiParty[F]): F[Unit] = ???
 
@@ -38,6 +39,13 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
         commonCode + """
         ScalaTropy(app[IO]).projectedOn[A]:
           tiedTo[B] via mqttNet
+          tiedTo[C] via mqttNet
+        """ should compile
+
+      it("should compile when a configured peer is a subtype of an architectural peer"):
+        commonCode + """
+        ScalaTropy(app[IO]).projectedOn[A]:
+          tiedTo[D] via mqttNet
           tiedTo[C] via mqttNet
         """ should compile
 

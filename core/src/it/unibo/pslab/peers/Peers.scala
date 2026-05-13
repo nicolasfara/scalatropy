@@ -51,7 +51,7 @@ object Peers:
 
   type Peer = { type Tie }
 
-  enum Quantifier[P <: Peer, Comm <: CommunicationProtocol]:
+  enum Quantifier[-P <: Peer, Comm <: CommunicationProtocol]:
     case SingleLink()
     case MultipleLink()
 
@@ -94,8 +94,9 @@ object Peers:
     import quotes.reflect.*
 
     def extractCommsBetween[P1 <: Peer: Type, P2 <: Peer: Type] =
+      val requestedPeer = TypeRepr.of[P2]
       extractArchitecturalLinksOf[P1]
-        .filter((_, peer) => peer =:= TypeRepr.of[P2]) // consider only Communication Protocols of P1 and P2
+        .filter((_, peer) => requestedPeer <:< peer) // links to a supertype also cover its subtypes
         .map(_._1)
 
     val pComms = extractCommsBetween[P, R]

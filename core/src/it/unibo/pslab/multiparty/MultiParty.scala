@@ -159,11 +159,32 @@ object MultiParty:
           CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
-          val Placement.Local(res, v) = value.runtimeChecked
-          for
-            receiver <- network.alivePeersOf[To].map(_.head)
-            _ <- network.send(v, res, receiver)
-          yield Placement.Remote(res),
+          /*
+            * Rationale: To support subtyping of peers, we should manage the case where:
+            *  - the sender peer is a subtype of `From` and produces the placed value (Local case)
+            *  - the sender peer is a subtype of `From` but it is not used its placed value (Remote case)
+            * 
+            * In the first case, we can directly send the value to the receiver(s) and return a `Remote` reference to it.
+            * In the second case, we should not send anything, but we still need to return a `Remote` reference to the receiver(s).
+            * 
+            * For example:
+            * type Foo <: { type Tie ... }
+            * type Device <: { type Tie ... }
+            * type Light <: Device
+            * type Thermometer <: Device
+            * 
+            * If `comm[Device, Foo](valueThermometer)` is executed by a `Thermometer`, we are in the first case,
+            * and we should send the value to `Foo` and return a reference to it.
+            * When executed on the Light peer, just skip the send phase.
+           */
+          val ref = value match
+            case Placement.Local(ref, value) =>
+              for
+                receiver <- network.alivePeersOf[To].map(_.head)
+                _ <- network.send(value, ref, receiver)
+              yield ref
+            case Placement.Remote(ref) => ref.pure
+          ref >>= (Placement.Remote(_).pure)
         )(ifRemote = network =>
           val Placement.Remote(res) = value.runtimeChecked
           for
@@ -178,11 +199,15 @@ object MultiParty:
           CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
-          val Placement.Local(res, v) = value.runtimeChecked
-          for
-            receivers <- network.alivePeersOf[To]
-            _ <- receivers.toList.traverse(network.send(v, res, _))
-          yield Placement.Remote(res),
+          /* Same rationale as above */
+          val ref = value match
+            case Placement.Local(ref, v) =>
+              for
+                receivers <- network.alivePeersOf[To]
+                _ <- receivers.toList.traverse(network.send(v, ref, _))
+              yield ref
+            case Placement.Remote(ref) => ref.pure
+          ref >>= (Placement.Remote(_).pure)
         )(ifRemote = network =>
           val Placement.Remote(res) = value.runtimeChecked
           for
@@ -205,13 +230,17 @@ object MultiParty:
           CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: Anisotropic[To, V] on From): F[V on To] =
         foldRuntimePeer(ifLocal = network =>
-          val Placement.Local(res, vMap) = value.runtimeChecked
-          for
-            receivers <- network.alivePeersOf[To]
-            _ <- receivers.toList.traverse: address =>
-              val v = vMap(address)
-              network.send(v, res, address)
-          yield Placement.Remote(res),
+          /* Same rationale as above */
+          val ref = value match
+            case Placement.Local(ref, vMap) =>
+              for
+                receivers <- network.alivePeersOf[To]
+                _ <- receivers.toList.traverse: address =>
+                  val v = vMap(address)
+                  network.send(v, ref, address)
+              yield ref
+            case Placement.Remote(ref) => ref.pure
+          ref >>= (Placement.Remote(_).pure)
         )(ifRemote = network =>
           val Placement.Remote(res) = value.runtimeChecked
           for
@@ -226,11 +255,15 @@ object MultiParty:
           CommunicationProtocolCompliance[From, To],
       )[V: Codable[F]](value: V on From): F[Anisotropic[From, V] on To] =
         foldRuntimePeer(ifLocal = network =>
-          val Placement.Local(res, v) = value.runtimeChecked
-          for
-            receiver <- network.alivePeersOf[To].map(_.head)
-            _ <- network.send(v, res, receiver)
-          yield Placement.Remote(res),
+          /* Same rationale as above */
+          val ref = value match
+            case Placement.Local(ref, value) =>
+              for
+                receiver <- network.alivePeersOf[To].map(_.head)
+                _ <- network.send(value, ref, receiver)
+              yield ref
+            case Placement.Remote(ref) => ref.pure
+            ref >>= (Placement.Remote(_).pure)
         )(ifRemote = network =>
           val Placement.Remote(res) = value.runtimeChecked
           for

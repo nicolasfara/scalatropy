@@ -82,7 +82,9 @@ object Deployment:
       )
     '{ () }
 
-  private def hasExhaustiveSubtypeMatching(using quotes: Quotes)(
+  private def hasExhaustiveSubtypeMatching(using
+      quotes: Quotes,
+  )(
       expectedPeers: List[quotes.reflect.TypeRepr],
       configuredPeers: List[quotes.reflect.TypeRepr],
   ): Boolean =
@@ -90,12 +92,11 @@ object Deployment:
 
     def loop(remainingExpected: List[TypeRepr], remainingConfigured: List[TypeRepr]): Boolean =
       remainingExpected match
-        case Nil => remainingConfigured.isEmpty
+        case Nil                      => remainingConfigured.isEmpty
         case expected :: expectedTail =>
-          remainingConfigured.indices.exists: index =>
-            val configured = remainingConfigured(index)
-            configured <:< expected &&
-              loop(expectedTail, remainingConfigured.patch(index, Nil, 1))
+          val matching = remainingConfigured.filter(configured => configured <:< expected)
+          if matching.isEmpty then false
+          else loop(expectedTail, remainingConfigured.diff(matching))
 
     loop(expectedPeers, configuredPeers)
 

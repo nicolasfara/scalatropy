@@ -141,7 +141,7 @@ object MqttNetwork:
 
     override def alivePeersOf[RP <: Peer: PeerTag as remotePeerTag]: F[NonEmptyList[PeerRef[RP]]] =
       peers.get.flatMap: peers =>
-        val filtered = peers.filter(_.tag == remotePeerTag)
+        val filtered = peers.filter(_.tag <:< remotePeerTag)
         NonEmptyList.fromList(filtered.toList) match
           case Some(nel) => nel.pure
           case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))

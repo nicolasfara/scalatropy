@@ -10,6 +10,7 @@ import upickle.default.{ readwriter, ReadWriter }
 object Peers:
   sealed trait PeerTag[-P <: Peer]:
     def baseTypeRepr: String
+    def supertypes: List[String]
     infix def <:<[R <: Peer](base: PeerTag[R]): Boolean
 
   final private case class PeerReprImpl[-P <: Peer](baseTypeRepr: String, supertypes: List[String]) extends PeerTag[P]:

@@ -1,10 +1,10 @@
 package it.unibo.pslab
 
+import it.unibo.pslab.network.AnyProtocol
+import it.unibo.pslab.peers.Peers.{ syntesizePeerTag, toSingle, via }
+
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should
-import it.unibo.pslab.network.AnyProtocol
-import it.unibo.pslab.peers.Peers.*
-import it.unibo.pslab.peers.Peers.syntesizePeerTag
 
 class PeerTagTest extends AnyFunSpec, should.Matchers:
   type Foo <: { type Tie <: via[AnyProtocol toSingle Bar] }

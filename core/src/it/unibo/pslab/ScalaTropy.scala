@@ -4,7 +4,7 @@ import it.unibo.pslab.deployment.Deployment
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
-import cats.Monad
+import cats.MonadThrow
 
 object ScalaTropy:
   export Deployment.*
@@ -30,11 +30,11 @@ object ScalaTropy:
    * @return
    *   a value that can be projected on a specific peer, given an appropriate deployment strategy.
    */
-  def apply[F[_]: Monad, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropyV2[F, Result] = Impl(program)
+  def apply[F[_]: MonadThrow, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropyV2[F, Result] = Impl(program)
 
-  final private class Impl[F[_]: Monad, Result](val program: MultiParty[F] ?=> F[Result])
+  final private class Impl[F[_]: MonadThrow, Result](val program: MultiParty[F] ?=> F[Result])
 
-  extension [F[_], Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result])
+  extension [F[_]: MonadThrow, Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result])
 
     /**
      * Perform the End Point Projection of the ScalaTropy program on a specific peer type.
@@ -50,7 +50,7 @@ object ScalaTropy:
      */
     inline def projectedOn[Local <: Peer: PeerTag](
         inline buildConnections: Deployment.Builder[F, Local, PeerId],
-    )(using Monad[F]): F[Result] =
+    ): F[Result] =
       Deployment.validate(buildConnections)
       val deployment = Deployment.Scope[F, Local, PeerId]()
       buildConnections(using deployment)

@@ -7,7 +7,7 @@ import it.unibo.pslab.multiparty.MultiParty.on
 import it.unibo.pslab.network.{ Codable, Network }
 import it.unibo.pslab.peers.Peers.{ CommunicationProtocolCompliance, Peer, PeerTag, TiedWithMultiple, TiedWithSingle }
 
-import cats.Monad
+import cats.{ Monad, MonadThrow }
 import cats.data.NonEmptyList
 import cats.syntax.all.*
 
@@ -122,7 +122,7 @@ object MultiParty:
     lang.coAnisotropicComm[From, To](value)
 
   // format: off
-  def make[F[_]: Monad, P <: Peer: PeerTag, PeerId[_ <: Peer]](
+  def make[F[_]: MonadThrow, P <: Peer: PeerTag, PeerId[_ <: Peer]](
       env: Environment[F],
       networks: Map[PeerTag[?], Network[F, P, PeerId]],
   ): MultiParty[F] =
@@ -135,7 +135,7 @@ object MultiParty:
       def fresh: MultiParty[F] = make(Environment.make[F], networks)
 
       def reachablePeers[RP <: Peer](using remote: PeerTag[RP])[L <: Peer: Label]: F[NonEmptyList[Remote[RP]]] =
-        networkOf(remote).alivePeersOf[RP]
+        networkOf(remote) >>= (_.alivePeersOf[RP])
 
       def on[Local <: Peer](using local: PeerTag[Local])[V](body: (Label[Local]) ?=> F[V]): F[V on Local] =
         given Label[Local] = new Label[Local] {}
@@ -277,11 +277,11 @@ object MultiParty:
       def foldRuntimePeer[From <: Peer: PeerTag as sourcePeer, To <: Peer: PeerTag as targetPeer](using
           matchingProtocol: CommunicationProtocolCompliance[From, To],
       )[Result](ifLocal: Handler[Result])(ifRemote: Handler[Result])(default: => F[Result]): F[Result] =
-        if runtimePeer <:< sourcePeer then ifLocal(networkOf(targetPeer))
-        else if runtimePeer <:< targetPeer then ifRemote(networkOf(sourcePeer))
+        if runtimePeer <:< sourcePeer then networkOf(targetPeer) >>= ifLocal
+        else if runtimePeer <:< targetPeer then networkOf(sourcePeer) >>= ifRemote
         else default
 
-      def networkOf(remotePeer: PeerTag[?]) =
-        lazy val error = () =>
-          throw RuntimeException(s"No network found for ${remotePeer}. This should not happen. Report this.")
-        networks.collectFirst { case (peer, network) if remotePeer <:< peer => network }.getOrElse(error())
+      def networkOf(remotePeer: PeerTag[?]): F[Network[F, P, PeerId]] =
+        networks
+          .collectFirst { case (peer, network) if remotePeer <:< peer => network }
+          .liftTo[F](RuntimeException(s"No network found for $remotePeer. This should not happen, report this!"))

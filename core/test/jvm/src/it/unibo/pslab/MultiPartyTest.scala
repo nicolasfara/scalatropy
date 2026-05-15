@@ -1,21 +1,20 @@
 package it.unibo.pslab
 
-import org.scalatest.funspec.AnyFunSpec
-import org.scalatest.matchers.should
 import it.unibo.pslab.ScalaTropy.*
+import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
-import it.unibo.pslab.network.AnyProtocol
-import it.unibo.pslab.peers.Peers.*
 import it.unibo.pslab.network.*
-import cats.Id
-import cats.Monad
+import it.unibo.pslab.peers.Peers.*
+
+import cats.{ Monad, MonadThrow }
+import cats.data.NonEmptyList
+import cats.effect.IO
 import cats.syntax.all.*
 import org.scalamock.stubs.Stubs
-import it.unibo.pslab.UpickleCodable.given
-import cats.MonadThrow
-import cats.data.NonEmptyList
-import it.unibo.pslab.multiparty.Environment.Reference
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.matchers.should
 
 type PeerRef[P <: Peer] = String
 
@@ -44,8 +43,8 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs:
           yield
             counter shouldBe 2
             ()
-        val network = stub[Network[Id, Bar, PeerRef]]
-        ScalaTropy(testProgram[Id]).projectedOn[Bar]:
+        val network = stub[Network[IO, Bar, PeerRef]]
+        ScalaTropy(testProgram[IO]).projectedOn[Bar]:
           tiedTo[Foo] via network
           tiedTo[Baz] via network
 

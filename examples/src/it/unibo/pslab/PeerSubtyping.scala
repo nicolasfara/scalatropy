@@ -14,6 +14,8 @@ import cats.MonadThrow
 import cats.effect.{ IO, IOApp }
 import cats.effect.std.Console
 import cats.syntax.all.*
+import cats.effect.std.Random
+import it.unibo.pslab.peers.Peers.syntesizePeerTag
 
 object PeerSubtyping:
   type Device <: { type Tie <: via[AnyProtocol toSingle Server] }
@@ -21,16 +23,24 @@ object PeerSubtyping:
   type Light <: Device
   type Thermometer <: Device
 
-  def program[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] = for
-    tempValue <- on[Device](10.pure)
-    diobestia <- on[Thermometer](10.pure)
-    diocane <- on[Server](10.pure)
-    bestemmiaOnDevice <- isotropicComm[Server, Device](diocane)
-    _ <- on[Device]:
-      take(bestemmiaOnDevice) >>= (value => F.println(s"Device received bestemmia from Server: ${value}"))
-    tempOnServer <- isotropicComm[Server, Thermometer](diocane)
-    _ <- on[Thermometer]:
-      take(tempOnServer) >>= (value => F.println(s"Server received temperature from Thermometer: ${value}"))
+  private def log[F[_]: Console, A](basic: String)(param: A): F[Unit] =
+    F.println(basic + param.toString())
+
+  def program[F[_]: {MonadThrow, Console, Random}](using MultiParty[F]): F[Unit] = for
+    fakeIdDevice <- on[Device] { 
+      F.betweenDouble(0.0, 10.0) flatTap log("Generated device ID: ")
+    }
+    temperature <- on[Thermometer] { F.nextInt }
+    _ <- on[Thermometer] {
+      take(fakeIdDevice) >>= log("On on subtype, I can access value on supertype: ")
+    }
+    _ <- on[Device] {
+      take(fakeIdDevice) >>= log("Anything that is a `Device` will execute this code block: ")
+    }
+    tempOnServer <- coAnisotropicComm[Thermometer, Server](temperature)
+    _ <- on[Server] {
+      takeAll(tempOnServer) >>= log("Temperatures: ")
+    }
   yield ()
 
 object PeerSubtypingLaunchAll extends IOApp.Simple:

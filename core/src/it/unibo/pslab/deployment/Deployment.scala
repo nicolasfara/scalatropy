@@ -65,43 +65,21 @@ object Deployment:
       builderExpr: Expr[Builder[F, Local, PeerId]],
   )(using quotes: Quotes): Expr[Unit] =
     import quotes.reflect.*
-    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2)
-    val expectedPeerNames = expectedPeers.map(peerName)
-    val configuredPeers = collectTiedPeers(builderExpr.asTerm)
-    val configuredPeerNames = configuredPeers.map(peerName)
-    val dupes = configuredPeerNames.diff(configuredPeerNames.distinct)
+    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2).map(peerName)
+    val configuredPeers = collectTiedPeers(builderExpr.asTerm).map(peerName)
+    val dupes = configuredPeers.diff(configuredPeers.distinct)
     if dupes.nonEmpty then
       report.errorAndAbort(
         s"Each peer type may only have one connection tie, but duplicates were found: ${dupes.mkString(", ")}",
       )
-    // if !hasExhaustiveSubtypeMatching(expectedPeers, configuredPeers) then
-    if expectedPeerNames.toSet != configuredPeerNames.toSet then
+    if expectedPeers.toSet != configuredPeers.toSet then
       report.errorAndAbort(
         s"""|Mismatch between expected and configured tied peers:
-            |- Expected (from architecture): ${expectedPeerNames.mkString(", ")}
-            |- Configured (from deployment): ${configuredPeerNames.mkString(", ")}
+            |- Expected (from architecture): ${expectedPeers.mkString(", ")}
+            |- Configured (from deployment): ${configuredPeers.mkString(", ")}
             |""".stripMargin,
       )
     '{ () }
-
-  private def hasExhaustiveSubtypeMatching(using
-      quotes: Quotes,
-  )(
-      expectedPeers: List[quotes.reflect.TypeRepr],
-      configuredPeers: List[quotes.reflect.TypeRepr],
-  ): Boolean =
-    import quotes.reflect.*
-
-    def loop(remainingExpected: List[TypeRepr], remainingConfigured: List[TypeRepr]): Boolean =
-      remainingExpected match
-        case Nil                      => remainingConfigured.isEmpty
-        case expected :: expectedTail =>
-          remainingConfigured.indices.exists: index =>
-            val configured = remainingConfigured(index)
-            configured <:< expected &&
-            loop(expectedTail, remainingConfigured.patch(index, Nil, 1))
-
-    loop(expectedPeers, configuredPeers)
 
   private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[quotes.reflect.TypeRepr] =
     import quotes.reflect.*

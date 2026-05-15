@@ -91,7 +91,7 @@ object ExperimentRunner:
   def mkdir(path: Path): Unit = if !Files.exists(path) then Files.createDirectories(path)
 
   def runScalaMain(fqn: String, args: String*): ProcessBuilder =
-    Process(Seq("./mill", "examples.runMain", fqn) ++ args)
+    Process(Seq("./mill", "--no-server", "examples.runMain", fqn) ++ args)
 
   def removeMatching(directory: Path, pattern: String): Unit =
     Files.list(directory).filter(p => p.getFileName.toString.matches(pattern)).forEach(Files.delete)

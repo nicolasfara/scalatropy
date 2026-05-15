@@ -27,10 +27,10 @@ object PeerSubtyping:
     F.println(basic + param.toString())
 
   def program[F[_]: {MonadThrow, Console, Random}](using MultiParty[F]): F[Unit] = for
-    fakeIdDevice <- on[Device] { 
+    fakeIdDevice <- on[Device] {
       F.betweenDouble(0.0, 10.0) flatTap log("Generated device ID: ")
     }
-    temperature <- on[Thermometer] { F.nextInt }
+    temperature <- on[Thermometer](F.nextInt)
     _ <- on[Thermometer] {
       take(fakeIdDevice) >>= log("On on subtype, I can access value on supertype: ")
     }

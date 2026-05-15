@@ -66,6 +66,7 @@ object Deployment:
   )(using quotes: Quotes): Expr[Unit] =
     import quotes.reflect.*
     val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2)
+    val expectedPeerNames = expectedPeers.map(peerName)
     val configuredPeers = collectTiedPeers(builderExpr.asTerm)
     val configuredPeerNames = configuredPeers.map(peerName)
     val dupes = configuredPeerNames.diff(configuredPeerNames.distinct)
@@ -73,16 +74,19 @@ object Deployment:
       report.errorAndAbort(
         s"Each peer type may only have one connection tie, but duplicates were found: ${dupes.mkString(", ")}",
       )
-    if !hasExhaustiveSubtypeMatching(expectedPeers, configuredPeers) then
+    // if !hasExhaustiveSubtypeMatching(expectedPeers, configuredPeers) then
+    if expectedPeerNames.toSet != configuredPeerNames.toSet then
       report.errorAndAbort(
         s"""|Mismatch between expected and configured tied peers:
-            |- Expected (from architecture): ${expectedPeers.map(peerName).mkString(", ")}
-            |- Configured (from deployment): ${configuredPeers.map(peerName).mkString(", ")}
+            |- Expected (from architecture): ${expectedPeerNames.mkString(", ")}
+            |- Configured (from deployment): ${configuredPeerNames.mkString(", ")}
             |""".stripMargin,
       )
     '{ () }
 
-  private def hasExhaustiveSubtypeMatching(using quotes: Quotes)(
+  private def hasExhaustiveSubtypeMatching(using
+      quotes: Quotes,
+  )(
       expectedPeers: List[quotes.reflect.TypeRepr],
       configuredPeers: List[quotes.reflect.TypeRepr],
   ): Boolean =
@@ -90,12 +94,12 @@ object Deployment:
 
     def loop(remainingExpected: List[TypeRepr], remainingConfigured: List[TypeRepr]): Boolean =
       remainingExpected match
-        case Nil => remainingConfigured.isEmpty
+        case Nil                      => remainingConfigured.isEmpty
         case expected :: expectedTail =>
           remainingConfigured.indices.exists: index =>
             val configured = remainingConfigured(index)
             configured <:< expected &&
-              loop(expectedTail, remainingConfigured.patch(index, Nil, 1))
+            loop(expectedTail, remainingConfigured.patch(index, Nil, 1))
 
     loop(expectedPeers, configuredPeers)
 

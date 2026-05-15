@@ -277,12 +277,11 @@ object MultiParty:
       def foldRuntimePeer[From <: Peer: PeerTag as sourcePeer, To <: Peer: PeerTag as targetPeer](using
           matchingProtocol: CommunicationProtocolCompliance[From, To],
       )[Result](ifLocal: Handler[Result])(ifRemote: Handler[Result])(default: => F[Result]): F[Result] =
-        val remotePeer = if runtimePeer <:< sourcePeer then targetPeer else sourcePeer
-        if runtimePeer <:< sourcePeer then ifLocal(networkOf(remotePeer))
+        if runtimePeer <:< sourcePeer then ifLocal(networkOf(targetPeer))
         else if runtimePeer <:< targetPeer then ifRemote(networkOf(sourcePeer))
         else default
 
-      def networkOf(peer: PeerTag[?]) =
+      def networkOf(remotePeer: PeerTag[?]) =
         lazy val error = () =>
-          throw RuntimeException(s"No network found for ${peer}. This should not happen. Report this.")
-        networks.getOrElse(peer, error())
+          throw RuntimeException(s"No network found for ${remotePeer}. This should not happen. Report this.")
+        networks.collectFirst { case (peer, network) if remotePeer <:< peer => network }.getOrElse(error())

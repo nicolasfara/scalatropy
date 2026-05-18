@@ -91,8 +91,14 @@ object core extends CrossPlatform {
 
 object distributed extends CommonJvm {
   def moduleDeps: Seq[JavaModule] = Seq(core.jvm)
+
+  val sttpVersion = "4.0.23"
   def mvnDeps = super.mvnDeps() ++ Seq(
     mvn"net.sigusr::fs2-mqtt:1.0.1",
+    mvn"com.softwaremill.sttp.client4::core:$sttpVersion",
+    mvn"com.softwaremill.sttp.client4::fs2:$sttpVersion",
+    mvn"org.http4s::http4s-ember-server:0.23.34",
+    mvn"org.http4s::http4s-dsl:0.23.34",
   )
 }
 

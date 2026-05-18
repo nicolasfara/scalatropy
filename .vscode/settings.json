@@ -1,0 +1,14 @@
+{
+    "files.watcherExclude": {
+        "**/target": true
+    },
+    "[scala]": {
+        "editor.suggestSelection": "first",
+        "editor.formatOnPaste": true,
+        "editor.formatOnType": true,
+        "editor.autoIndent": "advanced",
+        "editor.insertSpaces": true,
+        "editor.indentSize": 2,
+        "editor.tabSize": 2
+    }
+}

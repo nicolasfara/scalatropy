@@ -21,7 +21,8 @@
 cmake-build-*/
 
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
 
 ### Mill ###
 out

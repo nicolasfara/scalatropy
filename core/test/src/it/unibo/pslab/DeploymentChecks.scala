@@ -25,6 +25,7 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
     type A <: { type Tie <: via[MQTT toSingle B] & via[MQTT toSingle C] }
     type B <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle C] }
     type C <: { type Tie <: via[MQTT toSingle A] & via[MQTT toSingle B] }
+    type D <: B
 
     def app[F[_]: Monad](using MultiParty[F]): F[Unit] = ???
 
@@ -42,8 +43,19 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
         """ should compile
 
     describe("when is not coherent with architectural definition"):
-      describe("because of wrong communication protocol"):
-        it("should not compile"):
+      describe("it should not compile"):
+        it("if subpeers are specified while the architectural definition only accounts for superpeer"):
+          val compileErrors: List[Error] = typeCheckErrors(commonCode + """
+            ScalaTropy(app[IO]).projectedOn[A]:
+              tiedTo[D] via mqttNet
+              tiedTo[C] via mqttNet
+            """)
+          compileErrors should have size 1
+          println(compileErrors.head.message)
+          compileErrors.head.message should include:
+            "Mismatch between expected and configured tied peers"
+
+        it("if wrong communication protocol is used"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
           ScalaTropy(app[IO]).projectedOn[A]:
             tiedTo[B] via mqttNet
@@ -54,8 +66,7 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
           compileErrors.head.message should include:
             "Cannot prove that A <:< it.unibo.pslab.peers.Peers.TiedWithComm[C, Protocol]"
 
-      describe("because of wrong tie"):
-        it("should not compile"):
+        it("if wrong tie is provided"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
           ScalaTropy(app[IO]).projectedOn[A]:
             tiedTo[A] via mqttNet
@@ -70,8 +81,7 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
               "Local  is a type variable with constraint <: it.unibo.pslab.peers.Peers.TiedTo[A]"
           )
 
-      describe("because of using a network placed on a peer that is not the local one"):
-        it("should not compile"):
+        it("if a network placed on a peer that is not the local one is used"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
           val mqttNetworkOnB: MQTTNetwork[IO, B] = ???
 
@@ -83,8 +93,7 @@ class DeploymentChecks extends AnyFunSpec with should.Matchers:
           compileErrors.head.message should include:
             "Required: it.unibo.pslab.network.Network[cats.effect.IO, A"
 
-      describe("because of incomplete ties"):
-        it("should not compile"):
+        it("if incomplete ties are provided"):
           val compileErrors: List[Error] = typeCheckErrors(commonCode + """
           ScalaTropy(app[IO]).projectedOn[A]:
             tiedTo[B] via mqttNet

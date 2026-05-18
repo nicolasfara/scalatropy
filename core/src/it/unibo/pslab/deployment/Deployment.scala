@@ -65,14 +65,14 @@ object Deployment:
       builderExpr: Expr[Builder[F, Local, PeerId]],
   )(using quotes: Quotes): Expr[Unit] =
     import quotes.reflect.*
-    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2).map(_.typeSymbol.fullName).toSet
-    val configuredPeers = collectTiedPeers(builderExpr.asTerm)
+    val expectedPeers = extractArchitecturalLinksOf[Local].map(_._2).map(peerName)
+    val configuredPeers = collectTiedPeers(builderExpr.asTerm).map(peerName)
     val dupes = configuredPeers.diff(configuredPeers.distinct)
     if dupes.nonEmpty then
       report.errorAndAbort(
         s"Each peer type may only have one connection tie, but duplicates were found: ${dupes.mkString(", ")}",
       )
-    if expectedPeers != configuredPeers.toSet then
+    if expectedPeers.toSet != configuredPeers.toSet then
       report.errorAndAbort(
         s"""|Mismatch between expected and configured tied peers:
             |- Expected (from architecture): ${expectedPeers.mkString(", ")}
@@ -81,7 +81,7 @@ object Deployment:
       )
     '{ () }
 
-  private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[String] =
+  private def collectTiedPeers(using quotes: Quotes)(term: quotes.reflect.Term): List[quotes.reflect.TypeRepr] =
     import quotes.reflect.*
     val found = new TreeAccumulator[List[TypeRepr]]:
       def foldTree(acc: List[TypeRepr], tree: Tree)(owner: Symbol): List[TypeRepr] =
@@ -89,4 +89,8 @@ object Deployment:
           case TypeApply(fun, List(tpt)) if fun.symbol.name == "tiedTo" => acc :+ tpt.tpe
           case elem                                                     => foldOverTree(acc, tree)(owner)
     .foldTree(List.empty, term)(Symbol.spliceOwner)
-    found.map(_.typeSymbol.fullName)
+    found
+
+  private def peerName(using quotes: Quotes)(peer: quotes.reflect.TypeRepr): String =
+    val name = peer.typeSymbol.fullName
+    if name.nonEmpty then name else peer.show

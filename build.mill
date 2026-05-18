@@ -41,17 +41,29 @@ trait CommonTests extends TestModule.ScalaTest {
   )
 }
 
-trait CommonJvm extends CommonScala {
-  object test extends ScalaTests with CommonTests
+trait CommonJvmTests extends CommonTests {
+  override def mvnDeps = super.mvnDeps() ++ Seq(
+    mvn"org.scalamock::scalamock::7.5.5",
+  )
 }
 
-trait CommonNative extends ScalaNativeModule {
+trait CommonJvm extends CommonScala {
+  object test extends ScalaTests with CommonJvmTests
+}
+
+trait CommonNativePlatform extends ScalaNativeModule {
   def scalaNativeVersion = "0.5.11"
+}
+
+trait CommonNative extends CommonNativePlatform {
   object test extends ScalaNativeTests with CommonTests
 }
 
-trait CommonJS extends ScalaJSModule {
+trait CommonJSPlatform extends ScalaJSModule {
   def scalaJSVersion = "1.21.0"
+}
+
+trait CommonJS extends CommonJSPlatform {
   object test extends ScalaJSTests with CommonTests
 }
 
@@ -64,11 +76,17 @@ object core extends CrossPlatform {
     )
   }
 
-  object jvm extends Shared with CommonJvm
+  object jvm extends Shared {
+    object test extends CrossPlatformSources with CommonJvmTests
+  }
 
-  object native extends Shared with CommonNative
+  object native extends Shared with CommonNativePlatform {
+    object test extends ScalaNativeTests with CrossPlatformSources with CommonTests
+  }
 
-  object js extends Shared with CommonJS
+  object js extends Shared with CommonJSPlatform {
+    object test extends ScalaJSTests with CrossPlatformSources with CommonTests
+  }
 }
 
 object distributed extends CommonJvm {

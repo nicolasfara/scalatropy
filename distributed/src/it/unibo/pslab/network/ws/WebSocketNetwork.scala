@@ -1,13 +1,13 @@
 package it.unibo.pslab.network.ws
 
 import it.unibo.pslab.network.{
-  ScalaTropyMessage,
   BaseNetwork,
   Network,
   NetworkMonitor,
   NoSuchPeers,
   PeerId,
   PeerRef,
+  ScalaTropyMessage,
   WS,
 }
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
@@ -15,15 +15,12 @@ import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.data.NonEmptyList
 import cats.effect.{ Async, Concurrent, Ref }
-import cats.effect.std.Queue
+import cats.effect.kernel.Resource
+import cats.effect.std.{ Queue, Supervisor }
 import cats.syntax.all.*
-import cats.effect.syntax.all.*
-import org.http4s.ember.server.EmberServerBuilder
-import com.comcast.ip4s.Port
+import com.comcast.ip4s.{ host, IpAddress, Port, SocketAddress }
 import fs2.io.net.Network as Fs2Network
-import com.comcast.ip4s.IpAddress
-import com.comcast.ip4s.SocketAddress
-import com.comcast.ip4s.host
+import org.http4s.ember.server.EmberServerBuilder
 
 trait WebSocketNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], WS
 
@@ -33,19 +30,18 @@ object WebSocketNetwork:
       id: String,
       port: Int,
       knownPeers: Map[PeerId, SocketAddress[IpAddress]],
-  ): F[WebSocketNetwork[F, LP]] =
+  ): Resource[F, WebSocketNetwork[F, LP]] =
     for
-      alivePeers <- Ref.of[F, Map[String, Queue[F, Array[Byte]]]](Map.empty)
-      incomingMsgs <- Ref.of[F, IncomingMessages[F, PeerRef[?]]](IncomingMessages.empty)
-      impl = WebSocketNetworkImpl(id, port, knownPeers, alivePeers, incomingMsgs)
+      alivePeers <- Resource.eval(Ref.of[F, Map[String, Queue[F, Array[Byte]]]](Map.empty))
+      incomingMsgs <- Resource.eval(Ref.of[F, IncomingMessages[F, PeerRef[?]]](IncomingMessages.empty))
+      supervisor <- Supervisor[F]
+      impl = WebSocketNetworkImpl(id, port, knownPeers, alivePeers, incomingMsgs, supervisor)
       _ <- EmberServerBuilder
         .default[F]
-        .withHost(host"localhost") // TODO: handle invalid address
+        .withHost(host"localhost")
         .withPort(Port.fromInt(port).get) // TODO: handle invalid port
         .withHttpWebSocketApp(impl.setup(_).orNotFound)
         .build
-        .useForever
-        .start
     yield impl
 
   private class WebSocketNetworkImpl[
@@ -57,6 +53,7 @@ object WebSocketNetwork:
       connectedPeers: Map[PeerId, SocketAddress[IpAddress]],
       protected val alivePeers: Ref[F, Map[String, Queue[F, Array[Byte]]]],
       protected val incomingMsgs: Ref[F, IncomingMessages[F, PeerRef[?]]],
+      protected val supervisor: Supervisor[F],
   ) extends WebSocketNetwork[F, LP],
         WebSocketAcceptor[F],
         WebSocketConnector[F],
@@ -72,14 +69,11 @@ object WebSocketNetwork:
 
     override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
       val toAddress = connectedPeers.getOrElse(to, throw new NoSuchPeers(to.tag))
-      println(s"TO Address: ${toAddress}")
       emit[To, ScalaTropyMessage](to, id, toAddress.toString, message)
 
     override def onMessage(payload: Array[Byte]): F[Unit] =
       for
-        _ <- F.catchNonFatal(println(s"[WebSocketNetwork] received message with payload size ${payload.length}"))
         ScalaTropyMessage(address, resource, data) <- F.catchNonFatal(upickle.readBinary[ScalaTropyMessage](payload))
-        _ <- F.catchNonFatal(println(s"[WebSocketNetwork] decoded message from ${address} for resource ${resource}"))
         d <- takePeerMsgOrDefer((address, resource))
         _ <- d.complete(data)
       yield ()

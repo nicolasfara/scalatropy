@@ -1,16 +1,15 @@
 package it.unibo.pslab.network.ws
 
+import it.unibo.pslab.network.PeerRef
+import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
+
 import cats.effect.{ Async, Ref }
-import cats.effect.std.Queue
-import cats.effect.syntax.all.*
+import cats.effect.std.{ Queue, Supervisor }
 import cats.implicits.{ toFlatMapOps, toFunctorOps }
 import cats.syntax.all.*
 import fs2.{ Pipe, Stream }
-import it.unibo.pslab.peers.Peers.Peer
-import it.unibo.pslab.peers.Peers.PeerTag
-import upickle.default.Writer
 import scodec.bits.ByteVector
-import it.unibo.pslab.network.PeerRef
+import upickle.default.Writer
 
 trait WebSocketHandler[F[_]]:
   protected val alivePeers: Ref[F, Map[String, Queue[F, Array[Byte]]]]
@@ -25,10 +24,9 @@ trait WebSocketAcceptor[F[_]: Async] extends WebSocketHandler[F]:
 
   def setup(wsb: WebSocketBuilder2[F]): HttpRoutes[F] = HttpRoutes.of[F]:
     case req @ GET -> Root / "ws" / peerId =>
-      println(s"[WebSocketNetwork] incoming connection from ${peerId}")
       for
         q <- Queue.unbounded[F, Array[Byte]]
-        _ <- alivePeers.update(peers => peers + (peerId -> q))
+        _ <- alivePeers.update(_ + (peerId -> q))
         response <- wsb.build: incoming =>
           val incomingHandler = incoming
             .evalMap:
@@ -48,30 +46,37 @@ trait WebSocketConnector[F[_]: Async] extends WebSocketHandler[F]:
   import sttp.ws.WebSocketFrame
   import sttp.model.Uri
 
+  protected val supervisor: Supervisor[F]
+
   def emit[To <: Peer: PeerTag, Value: Writer](to: PeerRef[To], selfId: String, url: String, data: Value): F[Unit] =
     for
-      _ <- F.catchNonFatal(println(s"[WebSocketNetwork] emitting message to ${to} at ${url} with data: ${data}"))
       _ <- alivePeers.get >>= (peers => F.catchNonFatal(println(s"**** [WebSocketNetwork] ALIVE PEERS: ${peers}")))
       q <- alivePeers.get.flatMap(peers => peers.get(to.id).map(_.pure).getOrElse(bootstrap(to.id, selfId, url)))
       payload <- F.catchNonFatal(upickle.writeBinary(data))
-      _ <- F.catchNonFatal(println(s"[WebSocketNetwork] sending message to ${to} with payload size ${payload.length}"))
       _ <- q.offer(payload)
     yield ()
 
   private def bootstrap(peerId: String, selfId: String, url: String): F[Queue[F, Array[Byte]]] =
     for
       q <- Queue.unbounded[F, Array[Byte]]
-      _ <- openConnection(
-        url,
-        selfId,
-        incoming =>
-          val incomingHandler = incoming.evalMap:
-            case WebSocketFrame.Text(payload, true, _)   => onMessage(payload.getBytes)
-            case WebSocketFrame.Binary(payload, true, _) => onMessage(payload)
-            case _                                       => F.unit
-          val outgoing = Stream.repeatEval(q.take).map(WebSocketFrame.binary)
-          outgoing.concurrently(incomingHandler.drain),
-      ).guarantee(alivePeers.update(_ - peerId)).start
+      _ <- alivePeers.update(_ + (peerId -> q))
+      _ <- supervisor.supervise(
+        openConnection(
+          url,
+          selfId,
+          incoming =>
+            val incomingHandler = incoming.evalMap:
+              case WebSocketFrame.Text(payload, true, _)   => onMessage(payload.getBytes)
+              case WebSocketFrame.Binary(payload, true, _) => onMessage(payload)
+              case _                                       => F.unit
+            val outgoing = Stream.repeatEval(q.take).map(WebSocketFrame.binary)
+            // Let incoming drive: merge them so the stream only ends when
+            // the incoming side signals close (not just when outgoing has nothing)
+            incomingHandler.drain
+              .mergeHaltBoth(outgoing) // halts when EITHER side finishes
+              .onFinalize(alivePeers.update(_ - peerId) *> Async[F].delay(println(s"CLEANUP $peerId"))),
+        ),
+      )
     yield q
 
   private def openConnection(

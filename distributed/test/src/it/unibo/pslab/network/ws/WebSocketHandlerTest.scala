@@ -6,7 +6,6 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import fs2.Stream
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-import scala.concurrent.duration.*
 import cats.implicits.catsSyntaxApplicativeId
 import cats.Applicative
 import WebSocketHandlerTest.*
@@ -20,7 +19,7 @@ class WebSocketHandlerTest extends AsyncFlatSpec with AsyncIOSpec with Matchers:
       q <- Queue.unbounded[IO, Array[Byte]]
       incomingPayload = "Hello".getBytes
       incoming = Stream.emit(incomingPayload)
-      _ <- handler.session("peer-1", q, incoming).head.compile.drain.timeoutTo(500.millis, IO.unit)
+      _ <- handler.session("peer-1", q, incoming).head.compile.drain
       messages <- receivedMessages.get
     yield
       messages should have length 1
@@ -38,7 +37,6 @@ class WebSocketHandlerTest extends AsyncFlatSpec with AsyncIOSpec with Matchers:
         .head
         .compile
         .toList
-        .timeoutTo(500.millis, IO(List()))
     yield
       received should have length 1
       received.head should equal(outgoingPayload)
@@ -51,7 +49,7 @@ class WebSocketHandlerTest extends AsyncFlatSpec with AsyncIOSpec with Matchers:
       peerId = "peer-1"
       _ <- handler.alivePeers.update(_ + (peerId -> q))
       peersBefore <- handler.alivePeers.get
-      _ <- handler.session(peerId, q, incomingBytes = Stream.empty).compile.drain.timeoutTo(500.millis, IO.unit)
+      _ <- handler.session(peerId, q, incomingBytes = Stream.empty).compile.drain
       peersAfter <- handler.alivePeers.get
     yield
       peersBefore.size should be(1)

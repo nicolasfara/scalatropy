@@ -1,19 +1,20 @@
 package it.unibo.pslab.network.ws
 
-import it.unibo.pslab.network.PeerId
-
 import cats.effect.{ Async, Ref }
 import cats.effect.std.Queue
 import cats.effect.syntax.all.*
-import cats.implicits.{ catsSyntaxApplyOps, toFlatMapOps, toFunctorOps }
+import cats.implicits.{ toFlatMapOps, toFunctorOps }
 import cats.syntax.all.*
 import fs2.{ Pipe, Stream }
 import it.unibo.pslab.peers.Peers.Peer
-import it.unibo.pslab.network.PeerRef
 import it.unibo.pslab.peers.Peers.PeerTag
 import upickle.default.Writer
+import scodec.bits.ByteVector
+import it.unibo.pslab.network.PeerRef
 
 trait WebSocketHandler[F[_]]:
+  protected val alivePeers: Ref[F, Map[String, Queue[F, Array[Byte]]]]
+
   def onMessage(payload: Array[Byte]): F[Unit]
 
 trait WebSocketAcceptor[F[_]: Async] extends WebSocketHandler[F]:
@@ -23,15 +24,21 @@ trait WebSocketAcceptor[F[_]: Async] extends WebSocketHandler[F]:
   import org.http4s.websocket.WebSocketFrame
 
   def setup(wsb: WebSocketBuilder2[F]): HttpRoutes[F] = HttpRoutes.of[F]:
-    case GET -> Root / "ws" =>
-      val pipe: Pipe[F, WebSocketFrame, WebSocketFrame] = incoming =>
-        incoming
-          .evalMap:
-            case WebSocketFrame.Binary(payload, true) => onMessage(payload.toArray)
-            case WebSocketFrame.Text(payload, true)   => onMessage(payload.getBytes)
-            case _                                    => F.unit
-          .drain
-      wsb.build(pipe)
+    case req @ GET -> Root / "ws" / peerId =>
+      println(s"[WebSocketNetwork] incoming connection from ${peerId}")
+      for
+        q <- Queue.unbounded[F, Array[Byte]]
+        _ <- alivePeers.update(peers => peers + (peerId -> q))
+        response <- wsb.build: incoming =>
+          val incomingHandler = incoming
+            .evalMap:
+              case WebSocketFrame.Binary(payload, true) => onMessage(payload.toArray)
+              case WebSocketFrame.Text(payload, true)   => onMessage(payload.getBytes)
+              case _                                    => F.unit
+          val outgoing = Stream.repeatEval(q.take).map(p => WebSocketFrame.Binary(ByteVector(p)))
+          outgoing.concurrently(incomingHandler.drain).onFinalize(alivePeers.update(_ - peerId))
+      yield response
+end WebSocketAcceptor
 
 trait WebSocketConnector[F[_]: Async] extends WebSocketHandler[F]:
   import sttp.capabilities.fs2.Fs2Streams
@@ -41,41 +48,44 @@ trait WebSocketConnector[F[_]: Async] extends WebSocketHandler[F]:
   import sttp.ws.WebSocketFrame
   import sttp.model.Uri
 
-  protected val alivePeers: Ref[F, Map[PeerId, Queue[F, WebSocketFrame]]]
-
-  def emit[To <: Peer: PeerTag, Value: Writer](to: PeerRef[To], data: Value): F[Unit] =
+  def emit[To <: Peer: PeerTag, Value: Writer](to: PeerRef[To], selfId: String, url: String, data: Value): F[Unit] =
     for
-      q <- alivePeers.get.flatMap(peers => peers.get(to).map(_.pure).getOrElse(bootstrap(to)))
+      _ <- F.catchNonFatal(println(s"[WebSocketNetwork] emitting message to ${to} at ${url} with data: ${data}"))
+      _ <- alivePeers.get >>= (peers => F.catchNonFatal(println(s"**** [WebSocketNetwork] ALIVE PEERS: ${peers}")))
+      q <- alivePeers.get.flatMap(peers => peers.get(to.id).map(_.pure).getOrElse(bootstrap(to.id, selfId, url)))
       payload <- F.catchNonFatal(upickle.writeBinary(data))
-      _ <- F.catchNonFatal(
-        println(s"[WebSocketNetwork] sending message to ${to.id} with payload size ${payload.length}"),
-      )
-      _ <- q.offer(WebSocketFrame.binary(payload))
+      _ <- F.catchNonFatal(println(s"[WebSocketNetwork] sending message to ${to} with payload size ${payload.length}"))
+      _ <- q.offer(payload)
     yield ()
 
-  private def bootstrap(to: PeerId): F[Queue[F, WebSocketFrame]] =
+  private def bootstrap(peerId: String, selfId: String, url: String): F[Queue[F, Array[Byte]]] =
     for
-      q <- Queue.unbounded[F, WebSocketFrame]
-      _ <- F.catchNonFatal(println(s"[WebSocketNetwork] starting connection to ${to.id}"))
+      q <- Queue.unbounded[F, Array[Byte]]
       _ <- openConnection(
-        url = to.id,
-        pipe = incoming =>
+        url,
+        selfId,
+        incoming =>
           val incomingHandler = incoming.evalMap:
             case WebSocketFrame.Text(payload, true, _)   => onMessage(payload.getBytes)
             case WebSocketFrame.Binary(payload, true, _) => onMessage(payload)
             case _                                       => F.unit
-          Stream.repeatEval(q.take).concurrently(incomingHandler),
-      ).guarantee(alivePeers.update(_ - to)).start
+          val outgoing = Stream.repeatEval(q.take).map(WebSocketFrame.binary)
+          outgoing.concurrently(incomingHandler.drain),
+      ).guarantee(alivePeers.update(_ - peerId)).start
     yield q
 
-  private def openConnection(url: String, pipe: Pipe[F, WebSocketFrame.Data[?], WebSocketFrame]): F[Unit] =
+  private def openConnection(
+      url: String,
+      selfId: String,
+      pipe: Pipe[F, WebSocketFrame.Data[?], WebSocketFrame],
+  ): F[Unit] =
+    println(s"==> [WebSocketNetwork] opening ws client to ws://${url}/ws/${selfId}")
     HttpClientFs2Backend // TODO: parametrize
       .resource[F]()
       .use: backend =>
-        F.catchNonFatal(println(s"[WebSocketNetwork] opening ws client to $url")) *>
-          basicRequest
-            .get(Uri.unsafeParse(url)) // TODO: handle invalid URL
-            .response(asWebSocketStream(Fs2Streams[F])(pipe))
-            .send(backend)
-            .void
+        basicRequest
+          .get(Uri.unsafeParse("ws://" + url + "/ws/" + selfId)) // TODO: handle invalid URL
+          .response(asWebSocketStream(Fs2Streams[F])(pipe))
+          .send(backend)
+          .void
 end WebSocketConnector

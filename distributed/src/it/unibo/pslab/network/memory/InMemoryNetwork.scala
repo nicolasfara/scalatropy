@@ -3,8 +3,6 @@ package it.unibo.pslab.network.memory
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.{
   BaseNetwork,
-  Decodable,
-  Encodable,
   Memory,
   Network,
   NetworkError,
@@ -12,6 +10,7 @@ import it.unibo.pslab.network.{
   NoSuchPeers,
   PeerId,
   PeerRef,
+  ScalaTropyMessage,
 }
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
@@ -76,18 +75,8 @@ object InMemoryNetwork:
         case Some(nel) => nel.pure[F]
         case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
 
-    override def send[V: Encodable[F], To <: Peer: PeerTag](
-        value: V,
-        resource: Reference,
-        to: PeerRef[To],
-    ): F[Unit] =
-      for
-        encodedValue <- encodeAndTrack(value)
-        _ <- messagesDispatcher.route(encodedValue, resource, local, to)
-      yield ()
-
-    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: PeerRef[From]): F[V] =
-      receiveImpl(resource, from)
+    override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
+      messagesDispatcher.route(message.payload, message.resource, message.from, to)
 
     def asHandle: NetworkHandle[F] = new NetworkHandle[F]:
       override def deliver(payload: Array[Byte], resource: Reference, from: PeerId): F[Unit] =

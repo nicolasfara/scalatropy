@@ -21,9 +21,6 @@ object PeerSubtyping:
   type Light <: Device
   type Thermometer <: Device
 
-  private def log[F[_]: Console, A](basic: String)(param: A): F[Unit] =
-    F.println(basic + param.toString())
-
   def program[F[_]: {MonadThrow, Console, Random}](using MultiParty[F]): F[Unit] = for
     fakeIdDevice <- on[Device] {
       F.betweenDouble(0.0, 10.0) flatTap log("Generated device ID: ")

@@ -44,6 +44,7 @@ trait CommonTests extends TestModule.ScalaTest {
 trait CommonJvmTests extends CommonTests {
   override def mvnDeps = super.mvnDeps() ++ Seq(
     mvn"org.scalamock::scalamock::7.5.5",
+    mvn"org.typelevel::cats-effect-testing-scalatest:1.8.0",
   )
 }
 
@@ -91,8 +92,15 @@ object core extends CrossPlatform {
 
 object distributed extends CommonJvm {
   def moduleDeps: Seq[JavaModule] = Seq(core.jvm)
+
+  val sttpVersion = "4.0.23"
+  val http4sVersion = "0.23.34"
   def mvnDeps = super.mvnDeps() ++ Seq(
     mvn"net.sigusr::fs2-mqtt:1.0.1",
+    mvn"com.softwaremill.sttp.client4::core:$sttpVersion",
+    mvn"com.softwaremill.sttp.client4::fs2:$sttpVersion",
+    mvn"org.http4s::http4s-ember-server:$http4sVersion",
+    mvn"org.http4s::http4s-dsl:$http4sVersion",
   )
 }
 

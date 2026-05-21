@@ -4,6 +4,6 @@ type AnyProtocol = CommunicationProtocol
 
 trait MQTT extends CommunicationProtocol
 
-trait WS extends CommunicationProtocol
+trait WebSocket extends CommunicationProtocol
 
 trait Memory extends CommunicationProtocol

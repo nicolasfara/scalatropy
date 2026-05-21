@@ -4,11 +4,8 @@ import java.util.UUID
 
 import scala.concurrent.duration.{ DurationLong, FiniteDuration }
 
-import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.network.{
   BaseNetwork,
-  Decodable,
-  Encodable,
   MQTT,
   Network,
   NetworkError,
@@ -16,6 +13,7 @@ import it.unibo.pslab.network.{
   NoSuchPeers,
   PeerId,
   PeerRef,
+  ScalaTropyMessage,
 }
 import it.unibo.pslab.network.BaseNetwork.IncomingMessages
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
@@ -134,7 +132,7 @@ object MqttNetwork:
 
     def onApplicationMsg(data: Array[Byte]): F[Unit] =
       for
-        (address, resource, payload) = upickle.readBinary[(PeerId, Reference, Array[Byte])](data)
+        ScalaTropyMessage(address, resource, payload) = upickle.readBinary[ScalaTropyMessage](data)
         existing <- takePeerMsgOrDefer((address, resource))
         _ <- existing.complete(payload)
       yield ()
@@ -146,15 +144,11 @@ object MqttNetwork:
           case Some(nel) => nel.pure
           case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
 
-    override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerRef[To]): F[Unit] =
+    override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
       for
-        encodedValue <- encodeAndTrack(value)
-        payload = upickle.writeBinary((local, resource, encodedValue))
+        payload <- F.catchNonFatal(upickle.writeBinary(message))
         _ <- session.publish(Topics.inMsgs(networkConfig.appId, to.tag, to.id), payload, AtLeastOnce)
       yield ()
-
-    override def receive[V: Decodable[F], From <: Peer: PeerTag](resource: Reference, from: PeerRef[From]): F[V] =
-      receiveImpl(resource, from)
   end MqttNetworkImpl
 
   private given Conversion[Array[Byte], Vector[Byte]] = _.toVector

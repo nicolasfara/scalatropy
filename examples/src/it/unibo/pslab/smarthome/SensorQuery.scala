@@ -33,12 +33,19 @@ object SensorQuery:
   type LivingArea <: Device
   type NightArea <: Device
 
+  type Light <: Device
+  type NightLight <: NightArea
+  type LivingAreaLight <: LivingArea
+
   type BedroomThermometer <: NightArea
   type KitchenThermometer <: LivingArea
-  type BedroomLight <: NightArea
-  type LivingLight <: LivingArea
+  type BedroomLight <: NightLight
+  type LivingLight <: LivingAreaLight
 
   final case class DeviceStatus(name: String, value: Double) derives ReadWriter
+  final case class LightCommandPrompt(message: String) derives ReadWriter
+  final case class LightCommand(on: Boolean) derives ReadWriter
+  final case class LightCommandAck(message: String) derives ReadWriter
 
   private inline def getDeviceStatus[P <: Peer: PeerTag, F[_]: {MonadThrow, Random}]: F[DeviceStatus] = syntesizePeerTag[P] match
     case bedroomThermometer if bedroomThermometer <:< syntesizePeerTag[BedroomThermometer] => 
@@ -56,6 +63,29 @@ object SensorQuery:
     statusOnServer <- coAnisotropicComm[Device, Server](status)
     _ <- on[Server] {
       takeAll(statusOnServer).map(_.toMap.values) >>= log("Devices status: ")
+    }
+    prompt <- on[Server](LightCommandPrompt("Ready for night-area light command").pure)
+    promptOnDashboard <- comm[Server, Dashboard](prompt)
+    command <- on[Dashboard] {
+      for
+        prompt <- take(promptOnDashboard)
+        _ <- log("Dashboard received command prompt: ")(prompt)
+        command <- LightCommand(on = true).pure
+        _ <- log("Dashboard requested night-area light command: ")(command)
+      yield command
+    }
+    commandOnServer <- comm[Dashboard, Server](command)
+    actuation <- on[Server] {
+      take(commandOnServer).flatTap(log("Server actuating night-area light command: "))
+    }
+    commandOnNightLight <- isotropicComm[Server, NightLight](actuation)
+    _ <- on[NightLight] {
+      take(commandOnNightLight) >>= log("Night-area light command applied: ")
+    }
+    ack <- on[Server](LightCommandAck("Night-area light command forwarded").pure)
+    ackOnDashboard <- comm[Server, Dashboard](ack)
+    _ <- on[Dashboard] {
+      take(ackOnDashboard) >>= log("Dashboard received server acknowledgement: ")
     }
   yield ()
 

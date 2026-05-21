@@ -142,7 +142,7 @@ object MqttNetwork:
         val filtered = peers.filter(_.tag <:< remotePeerTag)
         NonEmptyList.fromList(filtered.toList) match
           case Some(nel) => nel.pure
-          case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
+          case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag, localPeerTag))
 
     override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
       for

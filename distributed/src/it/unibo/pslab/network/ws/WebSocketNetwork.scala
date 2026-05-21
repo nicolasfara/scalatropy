@@ -70,11 +70,11 @@ object WebSocketNetwork:
       val filtered = connectedPeers.keys.filter(_.tag <:< remotePeer)
       NonEmptyList.fromList(filtered.toList) match
         case Some(nel) => nel.pure
-        case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeer))
+        case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeer, localPeer))
 
     override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
       for
-        toAddress <- F.fromOption(connectedPeers.get(to), new NoSuchPeers(to.tag))
+        toAddress <- F.fromOption(connectedPeers.get(to), NoSuchPeers(to.tag, localPeer))
         _ <- emit(local, to, toAddress, message)
       yield ()
 

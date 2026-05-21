@@ -73,7 +73,7 @@ object InMemoryNetwork:
       val filtered = knownPeers.toList.filter(_.tag == remotePeerTag)
       NonEmptyList.fromList(filtered) match
         case Some(nel) => nel.pure[F]
-        case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag))
+        case None      => Concurrent[F].raiseError(NoSuchPeers(remotePeerTag, summon[PeerTag[LP]]))
 
     override def dispatch[To <: Peer: PeerTag](to: PeerRef[To], message: ScalaTropyMessage): F[Unit] =
       messagesDispatcher.route(message.payload, message.resource, message.from, to)

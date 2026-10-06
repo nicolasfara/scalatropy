@@ -7,6 +7,7 @@ import it.unibo.pslab.network.{
   Network,
   NetworkError,
   NetworkMonitor,
+  NoPeers,
   NoSuchPeers,
   PeerId,
   PeerRef,
@@ -19,7 +20,6 @@ import cats.data.NonEmptyList
 import cats.effect.kernel.{ Concurrent, Ref, Resource }
 import cats.effect.std.Console
 import cats.syntax.all.*
-import it.unibo.pslab.network.NoPeers
 
 trait InMemoryNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], Memory
 

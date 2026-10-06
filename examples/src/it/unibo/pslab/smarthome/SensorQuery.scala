@@ -1,17 +1,15 @@
 package it.unibo.pslab.smarthome
 
-import it.unibo.pslab.ScalaTropy
+import it.unibo.pslab.{ log, ScalaTropy }
 import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.deployment.Deployment.tiedTo
-import it.unibo.pslab.log
 import it.unibo.pslab.multiparty.{ Label, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.{ MQTT, PeerId, WebSocket }
 import it.unibo.pslab.network.mqtt.MqttNetwork
 import it.unibo.pslab.network.mqtt.MqttNetwork.Configuration
 import it.unibo.pslab.network.ws.WebSocketNetwork
-import it.unibo.pslab.peers.Peers.*
-import it.unibo.pslab.peers.Peers.syntesizePeerTag
+import it.unibo.pslab.peers.Peers.{ *, given }
 
 import cats.{ Monad, MonadThrow }
 import cats.effect.{ IO, IOApp }
@@ -63,13 +61,11 @@ object SensorQuery:
 
     def averageNightTemperature: Option[Double] =
       average(readings.collect:
-        case reading if reading.profile.zone == Zone.Night => reading.temperatureC
-      )
+        case reading if reading.profile.zone == Zone.Night => reading.temperatureC)
 
     def nightIlluminance: Option[Double] =
       average(readings.collect:
-        case reading if reading.profile.zone == Zone.Night => reading.illuminanceLux
-      )
+        case reading if reading.profile.zone == Zone.Night => reading.illuminanceLux)
 
     def summary: String =
       val temperature = averageNightTemperature.map(t => f"$t%.1f C").getOrElse("unknown")
@@ -155,13 +151,19 @@ object SensorQuery:
           yield ()
     yield ()
 
-  def buildSnapshot[F[_]: Monad](using lang: MultiParty[F], server: Label[Server])(
+  def buildSnapshot[F[_]: Monad](using
+      lang: MultiParty[F],
+      server: Label[Server],
+  )(
       readingsOnServer: lang.Anisotropic[Device, DeviceReading] on Server,
   ): F[HomeSnapshot] =
     takeAll(readingsOnServer).map: readings =>
       HomeSnapshot(readings.values.toList.sortBy(_.profile.name))
 
-  def approvePolicy[F[_]: {Monad, Console}](using lang: MultiParty[F], dashboard: Label[Dashboard])(
+  def approvePolicy[F[_]: {Monad, Console}](using
+      lang: MultiParty[F],
+      dashboard: Label[Dashboard],
+  )(
       reviewOnDashboard: DashboardReview on Dashboard,
   ): F[ComfortPolicy] =
     for

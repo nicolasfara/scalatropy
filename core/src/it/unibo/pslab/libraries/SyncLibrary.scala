@@ -6,8 +6,8 @@ import it.unibo.pslab.network.Codable
 import it.unibo.pslab.peers.Peers.{ CommunicationProtocolCompliance, PeerTag, TiedWithMultiple, TiedWithSingle }
 
 import cats.Monad
-import cats.syntax.all.*
 import cats.data.NonEmptyList
+import cats.syntax.all.*
 
 object SyncLibrary:
 

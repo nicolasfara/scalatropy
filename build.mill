@@ -13,7 +13,7 @@ import mill.scalanativelib.ScalaNativeModule
 import mill.scalajslib.ScalaJSModule
 
 trait CommonScala extends ScalaModule with ScalafixModule {
-  def scalaVersion = "3.8.1"
+  def scalaVersion = "3.9.0"
 
   def scalacOptions = Seq(
     "-Werror",
@@ -38,22 +38,17 @@ trait CommonTests extends TestModule.ScalaTest {
   def testParallelism = true
   override def mvnDeps = super.mvnDeps() ++ Seq(
     mvn"org.scalatest::scalatest::3.2.19",
-  )
-}
-
-trait CommonJvmTests extends CommonTests {
-  override def mvnDeps = super.mvnDeps() ++ Seq(
-    mvn"org.scalamock::scalamock::7.5.5",
+    mvn"org.scalamock::scalamock::7.6.0",
     mvn"org.typelevel::cats-effect-testing-scalatest:1.8.0",
   )
 }
 
 trait CommonJvm extends CommonScala {
-  object test extends ScalaTests with CommonJvmTests
+  object test extends ScalaTests with CommonTests
 }
 
 trait CommonNativePlatform extends ScalaNativeModule {
-  def scalaNativeVersion = "0.5.11"
+  def scalaNativeVersion = "0.5.12"
 }
 
 trait CommonNative extends CommonNativePlatform {
@@ -61,7 +56,7 @@ trait CommonNative extends CommonNativePlatform {
 }
 
 trait CommonJSPlatform extends ScalaJSModule {
-  def scalaJSVersion = "1.21.0"
+  def scalaJSVersion = "1.22.0"
 }
 
 trait CommonJS extends CommonJSPlatform {
@@ -78,7 +73,7 @@ object core extends CrossPlatform {
   }
 
   object jvm extends Shared {
-    object test extends CrossPlatformSources with CommonJvmTests
+    object test extends CrossPlatformSources with CommonTests
   }
 
   object native extends Shared with CommonNativePlatform {

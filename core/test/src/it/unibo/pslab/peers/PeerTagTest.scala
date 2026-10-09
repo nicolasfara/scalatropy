@@ -1,4 +1,4 @@
-package it.unibo.pslab
+package it.unibo.pslab.peers
 
 import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.peers.Peers.{ syntesizePeerTag, toSingle, via }

@@ -1,4 +1,4 @@
-package it.unibo.pslab
+package it.unibo.pslab.deployment
 
 import scala.compiletime.testing.{ typeCheckErrors, Error }
 

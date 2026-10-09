@@ -1,7 +1,8 @@
 package it.unibo.pslab.multiparty
 
+import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.ScalaTropy.*
-import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.multiparty.UpickleCodable.given
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*

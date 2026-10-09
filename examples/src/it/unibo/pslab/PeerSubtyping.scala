@@ -44,21 +44,21 @@ object PeerSubtypingLaunchAll extends IOApp.Simple:
 
 object ServerApp extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Server](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Server](Configuration(appId = "peer-subtyping"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(program[IO]).projectedOn[Server]:
         tiedTo[Device] via mqtt
 
 object LightApp extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Light](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Light](Configuration(appId = "peer-subtyping"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(program[IO]).projectedOn[Light]:
         tiedTo[Server] via mqtt
 
 object ThermometerApp extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Thermometer](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Thermometer](Configuration(appId = "peer-subtyping"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(program[IO]).projectedOn[Thermometer]:
         tiedTo[Server] via mqtt

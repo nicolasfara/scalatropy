@@ -4,6 +4,7 @@ import it.unibo.pslab.network.{
   BaseNetwork,
   Network,
   NetworkMonitor,
+  NoPeers,
   NoSuchPeers,
   PeerId,
   PeerRef,
@@ -24,7 +25,6 @@ import org.http4s.ember.server.EmberServerBuilder
 import sttp.capabilities.fs2.Fs2Streams
 import sttp.client4.WebSocketStreamBackend
 import sttp.client4.httpclient.fs2.HttpClientFs2Backend
-import it.unibo.pslab.network.NoPeers
 
 trait WebSocketNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], WebSocket
 

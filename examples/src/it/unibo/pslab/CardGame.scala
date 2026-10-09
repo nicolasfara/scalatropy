@@ -121,36 +121,36 @@ object CardGame:
 object LaunchAll extends IOApp.Simple:
   override def run: IO[Unit] =
     List(
-      CardGameDealerV2.run,
-      CardGamePlayer1V2.run,
-      CardGamePlayer2V2.run,
-      CardGamePlayer3V2.run,
+      CardGameDealer.run,
+      CardGamePlayer1.run,
+      CardGamePlayer2.run,
+      CardGamePlayer3.run,
     ).parSequence_
 
-object CardGameDealerV2 extends IOApp.Simple:
+object CardGameDealer extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Dealer](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Dealer](Configuration(appId = "cardgame"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Dealer]:
         tiedTo[Player] via mqtt
 
-object CardGamePlayer1V2 extends IOApp.Simple:
+object CardGamePlayer1 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
         tiedTo[Dealer] via mqtt
 
-object CardGamePlayer2V2 extends IOApp.Simple:
+object CardGamePlayer2 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
         tiedTo[Dealer] via mqtt
 
-object CardGamePlayer3V2 extends IOApp.Simple:
+object CardGamePlayer3 extends IOApp.Simple:
   override def run: IO[Unit] =
-    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame-v2"))
+    val mqttNetwork = MqttNetwork.localBroker[IO, Player](Configuration(appId = "cardgame"))
     mqttNetwork.use: mqtt =>
       ScalaTropy(cardGameEntrypoint[IO]).projectedOn[Player]:
         tiedTo[Dealer] via mqtt

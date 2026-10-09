@@ -95,7 +95,7 @@ trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor as monitor}, LP <: Peer] ext
         messages.toList
           .collectFirstSomeM:
             case ((sender, `resource`), message) if allowed(sender) =>
-              message.tryGet.map(_.map(sender.asInstanceOf[PeerRef[Peer]] -> _))
+              message.tryGet.map(_.map(sender -> _))
             case _ => none[(PeerRef[?], Array[Byte])].pure
           .flatTap:
             case Some((sender, _)) => incomingMsgs.update(_ - ((sender, resource)))
@@ -120,7 +120,7 @@ trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor as monitor}, LP <: Peer] ext
     yield sender -> decoded
 
   override def send[V: Encodable[F], To <: Peer: PeerTag](value: V, resource: Reference, to: PeerRef[To]): F[Unit] =
-    sendToAny(value, resource, to.asInstanceOf[PeerRef[Peer]])
+    sendToAny(value, resource, to)
 
   override def sendToAny[V: Encodable[F]](value: V, resource: Reference, to: PeerRef[Peer]): F[Unit] =
     for
@@ -129,17 +129,16 @@ trait BaseNetwork[F[_]: {Concurrent, NetworkMonitor as monitor}, LP <: Peer] ext
     yield ()
 
   protected def deliver(from: PeerRef[?], resource: Reference, payload: Array[Byte]): F[Unit] =
-    val sender = from.asInstanceOf[PeerRef[Peer]]
     for
       firstArrival <- firstArrivalMsgs.modify: messages =>
         val waiters = messages.getOrElse(resource, Nil)
-        val (matching, remaining) = waiters.partition(_.from(sender))
+        val (matching, remaining) = waiters.partition(_.from(from))
         val updated =
           if remaining.isEmpty then messages - resource
           else messages.updated(resource, remaining)
         (updated, matching.headOption.map(_.deferred))
       _ <- firstArrival match
-        case Some(waiter) => waiter.complete(sender -> payload).void
+        case Some(waiter) => waiter.complete(from -> payload).void
         case None         =>
           for
             exact <- takePeerMsgOrDefer((from, resource))

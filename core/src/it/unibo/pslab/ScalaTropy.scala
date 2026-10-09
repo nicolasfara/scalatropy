@@ -9,7 +9,7 @@ import cats.MonadThrow
 object ScalaTropy:
   export Deployment.*
 
-  opaque type ScalaTropyV2[F[_], Result] = Impl[F, Result]
+  opaque type ScalaTropy[F[_], Result] = Impl[F, Result]
 
   /**
    * The main entry point for ScalaTropy program instantiation and interpretation. Use this method to create a
@@ -19,7 +19,7 @@ object ScalaTropy:
    * For example:
    *
    * {{{
-   * ScalaTropyV2(mainProgram[IO]).projectedOn[PeerA]:
+   * ScalaTropy(mainProgram[IO]).projectedOn[PeerA]:
    *   tiedTo[PeerB] via IoTNetwork
    *   tiedTo[PeerC] via wsNetwork
    *   // other connections
@@ -30,11 +30,11 @@ object ScalaTropy:
    * @return
    *   a value that can be projected on a specific peer, given an appropriate deployment strategy.
    */
-  def apply[F[_]: MonadThrow, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropyV2[F, Result] = Impl(program)
+  def apply[F[_]: MonadThrow, Result](program: MultiParty[F] ?=> F[Result]): ScalaTropy[F, Result] = Impl(program)
 
   final private class Impl[F[_]: MonadThrow, Result](val program: MultiParty[F] ?=> F[Result])
 
-  extension [F[_]: MonadThrow, Result, PeerId[_ <: Peer]](trope: ScalaTropyV2[F, Result])
+  extension [F[_]: MonadThrow, Result, PeerId[_ <: Peer]](trope: ScalaTropy[F, Result])
 
     /**
      * Perform the End Point Projection of the ScalaTropy program on a specific peer type.

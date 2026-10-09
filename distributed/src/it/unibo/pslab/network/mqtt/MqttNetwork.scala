@@ -10,6 +10,7 @@ import it.unibo.pslab.network.{
   Network,
   NetworkError,
   NetworkMonitor,
+  NoPeers,
   NoSuchPeers,
   PeerId,
   PeerRef,
@@ -29,7 +30,6 @@ import fs2.io.net.Network as Fs2Network
 import net.sigusr.mqtt.api.{ Message, Session, SessionConfig, TransportConfig }
 import net.sigusr.mqtt.api.QualityOfService.AtLeastOnce
 import upickle.default as upickle
-import it.unibo.pslab.network.NoPeers
 
 trait MqttNetwork[F[_], LP <: Peer] extends Network[F, LP, PeerRef], MQTT
 

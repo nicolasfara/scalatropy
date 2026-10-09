@@ -16,6 +16,7 @@ import cats.syntax.all.*
 import upickle.default.ReadWriter
 
 import MasterWorker.*
+import it.unibo.pslab.libraries.SyncLibrary.scatterGather
 
 object MasterWorker:
   type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }
@@ -24,28 +25,35 @@ object MasterWorker:
   case class Task(x: Int) derives ReadWriter:
     def compute: Int = x * x
 
+  // def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
+  //   for
+  //     tasks <- on[Master]:
+  //       for
+  //         peers <- reachablePeers[Worker]
+  //         allocation = peers.map(_ -> Task(10)).toList.toMap
+  //         message <- anisotropicMessage[Master, Worker](allocation, Task(0))
+  //       yield message
+  //     taskOnWorker <- anisotropicComm[Master, Worker](tasks)
+  //     partialResult <- on[Worker]:
+  //       for
+  //         t <- take(taskOnWorker)
+  //         res <- t.compute.pure[F]
+  //         _ <- F.println(s"Worker received task with input ${t.x}, computed result: $res")
+  //       yield res
+  //     allResults <- coAnisotropicComm[Worker, Master](partialResult)
+  //     _ <- on[Master]:
+  //       for
+  //         resultsMap <- takeAll(allResults)
+  //         result = resultsMap.values.sum
+  //         _ <- F.println(s"Master collected results from workers: ${result}")
+  //       yield ()
+  //   yield ()
+
   def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
     for
-      tasks <- on[Master]:
-        for
-          peers <- reachablePeers[Worker]
-          allocation = peers.map(_ -> Task(scala.util.Random.nextInt(100))).toList.toMap
-          message <- anisotropicMessage[Master, Worker](allocation, Task(0))
-        yield message
-      taskOnWorker <- anisotropicComm[Master, Worker](tasks)
-      partialResult <- on[Worker]:
-        for
-          t <- take(taskOnWorker)
-          res <- t.compute.pure[F]
-          _ <- F.println(s"Worker received task with input ${t.x}, computed result: $res")
-        yield res
-      allResults <- coAnisotropicComm[Worker, Master](partialResult)
+      allResults <- scatterGather[Master, Worker](_.map(_ -> Task(10)).toList.toMap, Task(0))(_.compute.pure[F])
       _ <- on[Master]:
-        for
-          resultsMap <- takeAll(allResults)
-          result = resultsMap.values.sum
-          _ <- F.println(s"Master collected results from workers: ${result}")
-        yield ()
+        takeAll(allResults) >>= (_.values.sum.pure[F]) >>= log(s"Master collected results from workers: ")
     yield ()
 
 object MasterWorkerApp extends IOApp.Simple:

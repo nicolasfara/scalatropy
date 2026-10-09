@@ -1,4 +1,4 @@
-package it.unibo.pslab
+package it.unibo.pslab.multiparty
 
 import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given

@@ -36,7 +36,7 @@ object CardGame:
 
   def cardGameEntrypoint[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
     for
-      deck <- on[Dealer](Seq.fill(10)(Random.nextInt).toList.pure)
+      deck <- on[Dealer](Seq.fill(10)(Random.nextInt()).toList.pure)
       choice <- on[Player] {
         val secondCard = Random.nextBoolean()
         F.println(s"[Player] Do you want a second card? $secondCard")

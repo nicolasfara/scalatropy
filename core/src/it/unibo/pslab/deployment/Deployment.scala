@@ -27,16 +27,13 @@ object Deployment:
   class Scope[F[_], Local <: Peer, PeerId[_ <: Peer]]:
     private var localNetworks: Map[PeerTag[?], Network[F, Local, PeerId]] = Map()
 
-    opaque type Connection[Remote <: Peer] = PeerTag[Remote]
-
     /**
      * Define a connection between the local projected peer and a remote peer type which is tied to by the architectural
      * specification.
      */
-    def tiedTo[Remote <: Peer: PeerTag as remoteTag](using Local <:< TiedTo[Remote]): Connection[Remote] = remoteTag
+    def tiedTo[Remote <: Peer: PeerTag](using Local <:< TiedTo[Remote]): Connection[Remote] = Connection[Remote]
 
-    extension [Remote <: Peer: PeerTag as remoteTag](rc: Connection[Remote])
-
+    class Connection[Remote <: Peer: PeerTag as remoteTag]:
       /**
        * Binds a network protocol to the connection between the locally projected peer and the remote peer type
        * specified by [[tiedTo]], ensuring the protocol is compatible with the program's architectural definition.

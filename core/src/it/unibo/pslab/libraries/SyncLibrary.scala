@@ -29,10 +29,9 @@ object SyncLibrary:
       CommunicationProtocolCompliance[To, From],
   )[F[_]: Monad, Request: Codable[F], Response: Codable[F]](using
       MultiParty[F],
-  )(request: Request)(handle: Request => F[Response]): F[Response on From] =
+  )(request: Request on From)(handle: Request => F[Response]): F[Response on From] =
     for
-      reqOnRequester <- on[From](request.pure[F])
-      reqOnResponder <- comm[From, To](reqOnRequester)
+      reqOnResponder <- comm[From, To](request)
       resOnResponder <- on[To]:
         take(reqOnResponder) >>= handle
       resOnRequester <- comm[To, From](resOnResponder)
@@ -58,10 +57,9 @@ object SyncLibrary:
       CommunicationProtocolCompliance[To, From],
   )[F[_]: Monad, Request: Codable[F], Response: Codable[F]](using
       party: MultiParty[F],
-  )(request: Request)(handle: Request => F[Response]): F[party.Anisotropic[To, Response] on From] =
+  )(request: Request on From)(handle: Request => F[Response]): F[party.Anisotropic[To, Response] on From] =
     for
-      reqOnRequester <- on[From](request.pure[F])
-      reqOnResponder <- isotropicComm[From, To](reqOnRequester)
+      reqOnResponder <- isotropicComm[From, To](request)
       resOnResponder <- on[To]:
         take(reqOnResponder) >>= handle
       resOnRequester <- coAnisotropicComm[To, From](resOnResponder)

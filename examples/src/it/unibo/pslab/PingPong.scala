@@ -4,6 +4,7 @@ import scala.concurrent.duration.DurationInt
 
 import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.libraries.all.*
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.AnyProtocol
@@ -24,28 +25,35 @@ object PingPong:
   type Ponger <: { type Tie <: via[AnyProtocol toSingle Pinger] }
 
   def pingPongProgram[F[_]: {Monad, Console, Temporal}](using MultiParty[F]): F[Unit] =
-    for
-      initial <- on[Pinger](0.pure)
-      _ <- pingPong(initial)
-    yield ()
+    def pingPong(value: Int on Pinger): F[Unit] =
+      for
+        next <- requestReply[Pinger, Ponger](value): v =>
+          F.println(s"Ponger received value: $v") >> (v + 1).pure[F]
+        _ <- F.sleep(1.second)
+        _ <- pingPong(next)
+      yield ()
 
-  def pingPong[F[_]: {Monad, Console, Temporal}](using MultiParty[F])(initial: Int on Pinger): F[Unit] =
-    for
-      onPonger <- comm[Pinger, Ponger](initial)
-      newCounter <- on[Ponger]:
-        for
-          v <- take(onPonger)
-          _ <- F.println(s"Ponger received value: $v")
-        yield v + 1
-      newCounterOnPinger <- comm[Ponger, Pinger](newCounter)
-      result <- on[Pinger]:
-        for
-          v <- take(newCounterOnPinger)
-          _ <- F.println(s"Pinger received value: $v")
-        yield v + 1
-      _ <- F.sleep(1.second)
-      _ <- pingPong(result)
-    yield ()
+    on[Pinger](0.pure) >>= pingPong
+
+  // Alternative version, using plain communication primitives
+  //
+  // def pingPong[F[_]: {Monad, Console, Temporal}](using MultiParty[F])(initial: Int on Pinger): F[Unit] =
+  //   for
+  //     onPonger <- comm[Pinger, Ponger](initial)
+  //     newCounter <- on[Ponger]:
+  //       for
+  //         v <- take(onPonger)
+  //         _ <- F.println(s"Ponger received value: $v")
+  //       yield v + 1
+  //     newCounterOnPinger <- comm[Ponger, Pinger](newCounter)
+  //     result <- on[Pinger]:
+  //       for
+  //         v <- take(newCounterOnPinger)
+  //         _ <- F.println(s"Pinger received value: $v")
+  //       yield v + 1
+  //     _ <- F.sleep(1.second)
+  //     _ <- pingPong(result)
+  //   yield ()
 
 object PingPongApp extends IOApp.Simple:
   override def run: IO[Unit] = List(Pinger.run, Ponger.run).parSequence_

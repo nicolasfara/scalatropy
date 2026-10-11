@@ -2,6 +2,7 @@ package it.unibo.pslab
 
 import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.libraries.all.*
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.AnyProtocol
@@ -16,7 +17,6 @@ import cats.syntax.all.*
 import upickle.default.ReadWriter
 
 import MasterWorker.*
-import it.unibo.pslab.libraries.SyncLibrary.scatterGather
 
 object MasterWorker:
   type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }
@@ -25,6 +25,18 @@ object MasterWorker:
   case class Task(x: Int) derives ReadWriter:
     def compute: Int = x * x
 
+  def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
+    for
+      allResults <- scatterGather[Master, Worker](
+        allocator = _.map(_ -> Task(10)).toList.toMap,
+        default = Task(0),
+      )(_.compute.pure[F])
+      _ <- on[Master]:
+        takeAll(allResults) >>= (_.values.sum.pure[F]) >>= log("Master collected results from workers: ")
+    yield ()
+
+  // Alternative version, using plain communication primitives
+  //
   // def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
   //   for
   //     tasks <- on[Master]:
@@ -48,13 +60,6 @@ object MasterWorker:
   //         _ <- F.println(s"Master collected results from workers: ${result}")
   //       yield ()
   //   yield ()
-
-  def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
-    for
-      allResults <- scatterGather[Master, Worker](_.map(_ -> Task(10)).toList.toMap, Task(0))(_.compute.pure[F])
-      _ <- on[Master]:
-        takeAll(allResults) >>= (_.values.sum.pure[F]) >>= log(s"Master collected results from workers: ")
-    yield ()
 
 object MasterWorkerApp extends IOApp.Simple:
   override def run: IO[Unit] = List(MasterServer.run, Worker1.run, Worker2.run).parSequence_

@@ -8,6 +8,7 @@ import org.scalatest.matchers.should
 class DeploymentChecks extends AnyFunSpec with should.Matchers:
 
   inline val commonCode = """
+    import _root_.it.unibo.pslab.ScalaTropy
     import _root_.it.unibo.pslab.ScalaTropy.*
     import _root_.it.unibo.pslab.multiparty.MultiParty
     import _root_.it.unibo.pslab.multiparty.MultiParty.*

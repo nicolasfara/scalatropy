@@ -2,35 +2,28 @@ package it.unibo.pslab.multiparty
 
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.ScalaTropy.*
-import it.unibo.pslab.multiparty.UpickleCodable.given
 import it.unibo.pslab.multiparty.Environment.Reference
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.*
 import it.unibo.pslab.peers.Peers.*
+import it.unibo.pslab.utils.ScalaTropyTestEngine
 
-import cats.{ Monad, MonadThrow }
+import cats.MonadThrow
 import cats.data.NonEmptyList
-import cats.effect.IO
 import cats.syntax.all.*
 import org.scalamock.stubs.Stubs
+import org.scalatest.EitherValues.*
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should
 
 type PeerRef[P <: Peer] = String
+type ErrorOr[A] = Either[Throwable, A]
 
-object UpickleCodable:
-  export upickle.default as upickle
-  export upickle.*
-
-  given [F[_]: MonadThrow, T: ReadWriter]: CodableF[F, T] with
-    override inline def encode(value: T): F[Array[Byte]] = F.catchNonFatal(writeBinary(value))
-    override inline def decode(data: Array[Byte]): F[T] = F.catchNonFatal(readBinary[T](data))
-
-class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs:
-  type Foo <: { type Tie <: via[AnyProtocol toMultiple Foo] & via[AnyProtocol toMultiple Baz] }
+class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestEngine:
+  type Foo <: { type Tie <: via[* toMultiple Foo] & via[* toMultiple Baz] }
   type Bar <: Foo
-  type Baz <: { type Tie <: via[AnyProtocol toSingle Foo] }
+  type Baz <: { type Tie <: via[* toSingle Foo] }
 
   final class SelectNetwork[Local <: Peer](
       override val local: PeerRef[Local],
@@ -77,19 +70,15 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs:
   describe("The on operator"):
     describe("when involves a peer class with subtypes"):
       it("should evaluate the expression even in the subtypes classes"):
-        def testProgram[F[_]: Monad](using MultiParty[F]) =
-          var counter = 0
+        val result = testInIsolationScalaTropyProgram[ErrorOr, Bar]:
+          var evaluations = 0
           for
-            _ <- on[Foo]((counter += 1).pure)
-            _ <- on[Bar]((counter += 1).pure)
-            _ <- on[Baz]((counter += 1).pure)
-          yield
-            counter shouldBe 2
-            ()
-        val network = stub[Network[IO, Bar, PeerRef]]
-        ScalaTropy(testProgram[IO]).projectedOn[Bar]:
-          tiedTo[Foo] via network
-          tiedTo[Baz] via network
+            _ <- on[Foo]((evaluations += 1).pure[ErrorOr])
+            _ <- on[Bar]((evaluations += 1).pure[ErrorOr])
+            _ <- on[Baz]((evaluations += 1).pure[ErrorOr])
+          yield evaluations
+        result.isRight shouldBe true
+        result.value shouldBe 2
 
   describe("Isotropic Communication"):
     describe("when involves a peer class with subtypes"):

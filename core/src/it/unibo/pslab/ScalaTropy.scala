@@ -2,6 +2,7 @@ package it.unibo.pslab
 
 import it.unibo.pslab.deployment.Deployment
 import it.unibo.pslab.multiparty.{ Environment, MultiParty }
+import it.unibo.pslab.network.Network
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.MonadThrow
@@ -56,4 +57,23 @@ object ScalaTropy:
       buildConnections(using deployment)
       val env = Environment.make[F]
       val language = MultiParty.make(env, deployment.networks)
+      trope.program(using language)
+
+    /**
+     * Perform the End Point Projection of the ScalaTropy program on a specific peer type **without any safety checks**.
+     *
+     * @note
+     *   This method bypasses all safety checks and should be used with caution.
+     * @param Local
+     *   the local peer type to project on.
+     * @param networks
+     *   the network connections for the local peer type.
+     * @return
+     *   an effect that, when evaluated, yields the result of the program on the local peer.
+     */
+    private[pslab] inline def unsafeProjectedOn[Local <: Peer: PeerTag](
+        networks: Map[PeerTag[?], Network[F, Local, PeerId]],
+    ): F[Result] =
+      val env = Environment.make[F]
+      val language = MultiParty.make(env, networks)
       trope.program(using language)

@@ -3,7 +3,7 @@ package it.unibo.pslab.utils
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.network.{ CodableF, Network }
-import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
+import it.unibo.pslab.peers.Peers.{ extractPeerTagsLinkedTo, Peer, PeerTag }
 
 import cats.MonadThrow
 import org.scalamock.stubs.Stubs
@@ -13,11 +13,21 @@ type StringPeerId[P <: Peer] = String
 
 trait ScalaTropyTestEngine extends Stubs:
 
-  inline def testInIsolationScalaTropyProgram[F[_]: MonadThrow, Local <: Peer](using
+  inline def testScalaTropyProgramInIsolation[F[_]: MonadThrow, Local <: Peer](using
       PeerTag[Local],
+  )[Result](
+      program: MultiParty[F] ?=> F[Result],
+  ): F[Result] =
+    val network = stub[Network[F, Local, StringPeerId]]
+    testScalaTropyProgram[F, Local](network)[Result](program)
+
+  inline def testScalaTropyProgram[F[_]: MonadThrow, Local <: Peer](using
+      PeerTag[Local],
+  )(
+      network: Network[F, Local, StringPeerId],
   )[Result](program: MultiParty[F] ?=> F[Result]): F[Result] =
-    val stubbedNetwork = stub[Network[F, Local, StringPeerId]]
-    val connections = Map.empty[PeerTag[?], Network[F, Local, StringPeerId]].withDefault(_ => stubbedNetwork)
+    val connections: Map[PeerTag[?], Network[F, Local, StringPeerId]] =
+      extractPeerTagsLinkedTo[Local].map(_ -> network).toMap
     ScalaTropy(program).unsafeProjectedOn[Local](connections)
 
   export upickle.default as upickle

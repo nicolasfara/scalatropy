@@ -25,7 +25,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
   describe("The on operator"):
     describe("when involves a peer class with subtypes"):
       it("should evaluate the expression even in the subtypes classes"):
-        val result = testInIsolationScalaTropyProgram[ErrorOr, Bar]:
+        val result = testScalaTropyProgramInIsolation[ErrorOr, Bar]:
           var evaluations = 0
           for
             _ <- on[Foo]((evaluations += 1).pure[ErrorOr]) // this should be evaluated since `Bar` is a `Foo`

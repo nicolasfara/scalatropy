@@ -16,7 +16,7 @@ class SyntaxTest extends AnyFunSpec, should.Matchers, ScalaTropyTestEngine:
 
   describe("take2"):
     it("should correctly take two elements placed on a peer"):
-      testInIsolationScalaTropyProgram[ErrorOr, Node]:
+      testScalaTropyProgramInIsolation[ErrorOr, Node]:
         for
           value1 <- on[Node](10.pure[ErrorOr])
           value2 <- on[Node](20.pure[ErrorOr])

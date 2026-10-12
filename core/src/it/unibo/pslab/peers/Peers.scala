@@ -25,29 +25,25 @@ object Peers:
   inline given syntesizePeerTag[P <: Peer]: PeerTag[P] = ${ peerReprImpl[P] }
 
   private def peerReprImpl[T <: Peer: Type](using quotes: Quotes): Expr[PeerTag[T]] =
+    peerReprFromTypeRepr(quotes.reflect.TypeRepr.of[T])
+
+  private def peerReprFromTypeRepr(using quotes: Quotes)(tpe: quotes.reflect.TypeRepr) =
     import quotes.reflect.*
 
     def collectBasesOfType(tpe: TypeRepr): List[Symbol] =
       tpe match
-        case Refinement(parent, _, _) =>
-          collectBasesOfType(parent)
-        case AndType(left, right) =>
-          collectBasesOfType(left) ++ collectBasesOfType(right)
-        case _ if tpe.typeSymbol.exists =>
-          collectBasesOfSymbol(tpe.typeSymbol)
-        case _ =>
-          List.empty
+        case Refinement(parent, _, _)   => collectBasesOfType(parent)
+        case AndType(left, right)       => collectBasesOfType(left) ++ collectBasesOfType(right)
+        case _ if tpe.typeSymbol.exists => collectBasesOfSymbol(tpe.typeSymbol)
+        case _                          => List.empty
 
     def collectBasesOfSymbol(symbol: Symbol): List[Symbol] =
       symbol.info match
-        case TypeBounds(_, hi) =>
-          symbol :: collectBasesOfType(hi)
-        case _ =>
-          List.empty
+        case TypeBounds(_, hi) => symbol :: collectBasesOfType(hi)
+        case _                 => List.empty
 
-    val types = collectBasesOfSymbol(TypeRepr.of[T].typeSymbol).map(_.fullName)
+    val types = collectBasesOfSymbol(tpe.typeSymbol).map(_.fullName)
     '{ PeerReprImpl(${ Expr(types.head) }, ${ Expr(types.tail) }) }
-  end peerReprImpl
 
   type Peer = { type Tie }
 
@@ -107,6 +103,13 @@ object Peers:
       report.errorAndAbort(s"Extracted type ${pComms.head.show} is not a `CommunicationProtocol`")
 
     '{ new CommunicationProtocolCompliance[P, R] {} }
+
+  private[pslab] inline def extractPeerTagsLinkedTo[P <: Peer]: List[PeerTag[?]] =
+    ${ extractPeerTagsLinkedToImpl[P] }
+
+  private def extractPeerTagsLinkedToImpl[P <: Peer: Type](using quotes: Quotes): Expr[List[PeerTag[?]]] =
+    val tags = extractArchitecturalLinksOf[P].map(_._2).map(peerReprFromTypeRepr)
+    Expr.ofList(tags)
 
   private[pslab] def extractArchitecturalLinksOf[P <: Peer: Type](using
       quotes: Quotes,

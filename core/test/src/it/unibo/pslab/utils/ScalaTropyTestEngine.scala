@@ -6,7 +6,6 @@ import it.unibo.pslab.network.Network
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.MonadThrow
-import cats.syntax.all.*
 import org.scalamock.stubs.Stubs
 import it.unibo.pslab.network.CodableF
 

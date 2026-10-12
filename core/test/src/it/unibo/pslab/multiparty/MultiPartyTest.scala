@@ -7,7 +7,7 @@ import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.*
 import it.unibo.pslab.peers.Peers.*
-import it.unibo.pslab.utils.ScalaTropyTestEngine
+import it.unibo.pslab.utils.{ ErrorOr, InMemoryTestNetwork, ScalaTropyTestEngine, StringPeerId }
 
 import cats.MonadThrow
 import cats.data.NonEmptyList
@@ -17,55 +17,10 @@ import org.scalatest.EitherValues.*
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.matchers.should
 
-type PeerRef[P <: Peer] = String
-type ErrorOr[A] = Either[Throwable, A]
-
 class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestEngine:
   type Foo <: { type Tie <: via[* toMultiple Foo] & via[* toMultiple Baz] }
   type Bar <: Foo
   type Baz <: { type Tie <: via[* toSingle Foo] }
-
-  final class SelectNetwork[Local <: Peer](
-      override val local: PeerRef[Local],
-      alive: NonEmptyList[PeerRef[Peer]],
-      received: Option[(PeerRef[Peer], Boolean)] = None,
-  ) extends Network[[A] =>> Either[Throwable, A], Local, PeerRef]:
-    var sent: List[(Boolean, PeerRef[Peer])] = Nil
-
-    override def send[V: Encodable[[A] =>> Either[Throwable, A]], To <: Peer: PeerTag](
-        value: V,
-        resource: Reference,
-        to: PeerRef[To],
-    ): Either[Throwable, Unit] =
-      sendToAny(value, resource, to)
-
-    override def sendToAny[V: Encodable[[A] =>> Either[Throwable, A]]](
-        value: V,
-        resource: Reference,
-        to: PeerRef[Peer],
-    ): Either[Throwable, Unit] =
-      sent = sent :+ (value.asInstanceOf[Boolean] -> to)
-      ().asRight
-
-    override def receive[V: Decodable[[A] =>> Either[Throwable, A]], From <: Peer: PeerTag](
-        resource: Reference,
-        from: PeerRef[From],
-    ): Either[Throwable, V] =
-      RuntimeException("receive should not be used by select tests").asLeft
-
-    override def receiveFromAny[V: Decodable[[A] =>> Either[Throwable, A]]](
-        resource: Reference,
-        from: NonEmptyList[PeerRef[Peer]],
-    ): Either[Throwable, (PeerRef[Peer], V)] =
-      received
-        .map((sender, value) => sender -> value.asInstanceOf[V])
-        .toRight(RuntimeException("No selection received"))
-
-    override def alivePeersOf[RP <: Peer: PeerTag]: Either[Throwable, NonEmptyList[PeerRef[RP]]] =
-      alive.asInstanceOf[NonEmptyList[PeerRef[RP]]].asRight
-
-    override def alivePeers[UP <: Peer]: Either[Throwable, NonEmptyList[PeerRef[UP]]] =
-      alive.asInstanceOf[NonEmptyList[PeerRef[UP]]].asRight
 
   describe("The on operator"):
     describe("when involves a peer class with subtypes"):
@@ -73,9 +28,9 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
         val result = testInIsolationScalaTropyProgram[ErrorOr, Bar]:
           var evaluations = 0
           for
-            _ <- on[Foo]((evaluations += 1).pure[ErrorOr])
-            _ <- on[Bar]((evaluations += 1).pure[ErrorOr])
-            _ <- on[Baz]((evaluations += 1).pure[ErrorOr])
+            _ <- on[Foo]((evaluations += 1).pure[ErrorOr]) // this should be evaluated since `Bar` is a `Foo`
+            _ <- on[Bar]((evaluations += 1).pure[ErrorOr]) // this should be evaluated since the peer is exactly `Bar`
+            _ <- on[Baz]((evaluations += 1).pure[ErrorOr]) // this should not be evaluated since `Bar` is not a `Baz`
           yield evaluations
         result.isRight shouldBe true
         result.value shouldBe 2
@@ -88,10 +43,10 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
           placed <- isotropicComm[Foo, Baz](res)
         yield ()
 
-        val network = stub[Network[[A] =>> Either[Throwable, A], Bar, PeerRef]]
+        val network = stub[Network[[A] =>> Either[Throwable, A], Bar, StringPeerId]]
         (network.alivePeersOf(using _: PeerTag[Baz])).returnsWith(NonEmptyList.of("first").asRight)
         (network
-          .send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using
+          .send[Int, Baz](_: Int, _: Reference, _: StringPeerId[Baz])(using
             _: Encodable[[A] =>> Either[Throwable, A]][Int],
             _: PeerTag[Baz],
           ))
@@ -102,7 +57,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
 
         // Even if the `isotropicComm` has a sender Foo, Bar is a subtype of Foo, so it should be able to send the message as well.
         (network
-          .send[Int, Baz](_: Int, _: Reference, _: PeerRef[Baz])(using
+          .send[Int, Baz](_: Int, _: Reference, _: StringPeerId[Baz])(using
             _: Encodable[[A] =>> Either[Throwable, A]][Int],
             _: PeerTag[Baz],
           ))
@@ -115,7 +70,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
         result <- select[Foo](decision)(_.pure)
       yield result shouldBe true
 
-      val network = SelectNetwork[Bar]("selector", NonEmptyList.of("relay", "downstream"))
+      val network = InMemoryTestNetwork[Bar, Boolean]("selector", NonEmptyList.of("relay", "downstream"))
       ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Bar]:
         tiedTo[Foo] via network
         tiedTo[Baz] via network
@@ -128,7 +83,8 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
         result <- select[Foo](decision)(_.pure)
       yield result shouldBe true
 
-      val network = SelectNetwork[Baz]("relay", NonEmptyList.of("selector", "downstream"), Some("selector" -> true))
+      val network =
+        InMemoryTestNetwork[Baz, Boolean]("relay", NonEmptyList.of("selector", "downstream"), Some("selector" -> true))
       ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Baz]:
         tiedTo[Foo] via network
 
@@ -140,7 +96,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
         result <- select[Foo](decision)(_.pure)
       yield result shouldBe false
 
-      val network = SelectNetwork[Baz]("downstream", NonEmptyList.of("relay"), Some("relay" -> false))
+      val network = InMemoryTestNetwork[Baz, Boolean]("downstream", NonEmptyList.of("relay"), Some("relay" -> false))
       ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Baz]:
         tiedTo[Foo] via network
 

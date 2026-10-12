@@ -2,16 +2,16 @@ package it.unibo.pslab.utils
 
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.multiparty.MultiParty
-import it.unibo.pslab.network.Network
+import it.unibo.pslab.network.{ CodableF, Network }
 import it.unibo.pslab.peers.Peers.{ Peer, PeerTag }
 
 import cats.MonadThrow
 import org.scalamock.stubs.Stubs
-import it.unibo.pslab.network.CodableF
+
+/** A peer reference identifying peers by name, used by [[InMemoryTestNetwork]]. */
+type StringPeerId[P <: Peer] = String
 
 trait ScalaTropyTestEngine extends Stubs:
-
-  type StringPeerId[P <: Peer] = String
 
   inline def testInIsolationScalaTropyProgram[F[_]: MonadThrow, Local <: Peer](using
       PeerTag[Local],

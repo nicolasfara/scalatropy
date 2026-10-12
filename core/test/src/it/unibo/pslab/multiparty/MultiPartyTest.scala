@@ -84,7 +84,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
       yield result shouldBe true
 
       val network =
-        InMemoryTestNetwork[Baz, Boolean]("relay", NonEmptyList.of("selector", "downstream"), Some("selector" -> true))
+        InMemoryTestNetwork[Baz, Boolean]("relay", NonEmptyList.of("selector", "downstream"), "selector" -> true :: Nil)
       ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Baz]:
         tiedTo[Foo] via network
 
@@ -96,7 +96,7 @@ class MultiPartyTest extends AnyFunSpec, should.Matchers, Stubs, ScalaTropyTestE
         result <- select[Foo](decision)(_.pure)
       yield result shouldBe false
 
-      val network = InMemoryTestNetwork[Baz, Boolean]("downstream", NonEmptyList.of("relay"), Some("relay" -> false))
+      val network = InMemoryTestNetwork[Baz, Boolean]("downstream", NonEmptyList.of("relay"), "relay" -> false :: Nil)
       ScalaTropy(testProgram[[A] =>> Either[Throwable, A]]).projectedOn[Baz]:
         tiedTo[Foo] via network
 

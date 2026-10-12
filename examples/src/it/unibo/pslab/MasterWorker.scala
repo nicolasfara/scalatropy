@@ -28,7 +28,7 @@ object MasterWorker:
   def masterWorkerProgram[F[_]: {MonadThrow, Console}](using MultiParty[F]): F[Unit] =
     for
       allResults <- scatterGather[Master, Worker](
-        allocator = _.map(_ -> Task(10)).toList.toMap,
+        allocator = _.map(_ -> Task(10)).toList.toMap.pure[F],
         default = Task(0),
       )(_.compute.pure[F])
       _ <- on[Master]:

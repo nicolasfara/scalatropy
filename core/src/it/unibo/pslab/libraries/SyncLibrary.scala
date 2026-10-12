@@ -8,6 +8,7 @@ import it.unibo.pslab.peers.Peers.{ CommunicationProtocolCompliance, PeerTag, Ti
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.all.*
+import it.unibo.pslab.multiparty.Label
 
 object SyncLibrary:
 
@@ -72,7 +73,7 @@ object SyncLibrary:
    * implement.
    *
    * @param allocator
-   *   The function responsible for allocating tasks to the available peers.
+   *   The effectful function responsible for allocating tasks to the available peers.
    * @param default
    *   The default task to be used in case a peer is not allocated a specific task.
    * @param compute
@@ -86,14 +87,14 @@ object SyncLibrary:
   )[F[_]: Monad, Task: Codable[F], PartialResult: Codable[F]](using
       party: MultiParty[F],
   )(
-      allocator: NonEmptyList[party.Remote[To]] => Map[party.Remote[To], Task],
+      allocator: Label[From] ?=> NonEmptyList[party.Remote[To]] => F[Map[party.Remote[To], Task]],
       default: Task,
   )(compute: Task => F[PartialResult]): F[party.Anisotropic[To, PartialResult] on From] =
     for
       messages <- on[From]:
         for
           peers <- reachablePeers[To]
-          allocation = allocator(peers)
+          allocation <- allocator(peers)
           message <- anisotropicMessage[From, To](allocation, default)
         yield message
       task <- anisotropicComm[From, To](messages)

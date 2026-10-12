@@ -6,6 +6,7 @@ import it.unibo.pslab.UpickleCodable.given
 import it.unibo.pslab.matmul.LinearAlgebra.*
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
+import it.unibo.pslab.libraries.all.*
 import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.NetworkMonitor.withCsvMonitoring
 import it.unibo.pslab.network.mqtt.MqttNetwork
@@ -20,6 +21,7 @@ import cats.syntax.all.*
 import upickle.default.ReadWriter
 
 import MatMulMasterWorker.*
+import upickle.default
 
 object MatMulMasterWorker:
   type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }
@@ -45,18 +47,14 @@ object MatMulMasterWorker:
       MultiParty[F],
   )(matrix: Matrix[Double] on Master, vector: Vec[Double] on Master): F[Unit] =
     for
-      tasks <- on[Master]:
-        for
-          m <- take(matrix)
-          v <- take(vector)
-          workers <- reachablePeers[Worker]
-          allocation <- allocate(m, v) to workers
-          message <- anisotropicMessage[Master, Worker](allocation, Task.nil)
-        yield message
-      taskOnWorker <- anisotropicComm[Master, Worker](tasks)
-      partialResult <- on[Worker]:
-        take(taskOnWorker).map(_.compute)
-      allResults <- coAnisotropicComm[Worker, Master](partialResult)
+      allResults <- scatterGather[Master, Worker](
+        default = Task.nil,
+        allocator = workers =>
+          for
+            (m, v) <- take2(matrix, vector)
+            allocation <- allocate(m, v) to workers
+          yield allocation,
+      )(_.compute.pure[F])
       _ <- on[Master]:
         for
           resultsMap <- takeAll(allResults)

@@ -18,7 +18,7 @@ type ErrorOr[A] = Either[Throwable, A]
 final class InMemoryTestNetwork[Local <: Peer, Message](
     override val local: StringPeerId[Local],
     alive: NonEmptyList[StringPeerId[Peer]],
-    received: Option[(StringPeerId[Peer], Message)] = None,
+    received: List[(StringPeerId[Peer], Message)] = Nil,
 ) extends Network[ErrorOr, Local, StringPeerId]:
 
   private var sentMessages: List[(Message, StringPeerId[Peer])] = Nil
@@ -44,6 +44,7 @@ final class InMemoryTestNetwork[Local <: Peer, Message](
     received
       .filter(_._1 == from)
       .map(_._2.asInstanceOf[V])
+      .headOption
       .toRight(RuntimeException(s"No message received for $from"))
 
   override def receiveFromAny[V: Decodable[ErrorOr]](
@@ -51,7 +52,9 @@ final class InMemoryTestNetwork[Local <: Peer, Message](
       from: NonEmptyList[StringPeerId[Peer]],
   ): ErrorOr[(StringPeerId[Peer], V)] =
     received
+      .filter { case (sender, _) => from.exists(_ == sender) }
       .map((sender, value) => sender -> value.asInstanceOf[V])
+      .headOption
       .toRight(RuntimeException("No message received"))
 
   override def alivePeersOf[RP <: Peer: PeerTag]: ErrorOr[NonEmptyList[StringPeerId[RP]]] =

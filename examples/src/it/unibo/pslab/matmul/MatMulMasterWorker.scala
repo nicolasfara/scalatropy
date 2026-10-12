@@ -3,10 +3,10 @@ package it.unibo.pslab.matmul
 import it.unibo.pslab.ScalaTropy
 import it.unibo.pslab.ScalaTropy.*
 import it.unibo.pslab.UpickleCodable.given
+import it.unibo.pslab.libraries.all.*
 import it.unibo.pslab.matmul.LinearAlgebra.*
 import it.unibo.pslab.multiparty.MultiParty
 import it.unibo.pslab.multiparty.MultiParty.*
-import it.unibo.pslab.libraries.all.*
 import it.unibo.pslab.network.AnyProtocol
 import it.unibo.pslab.network.NetworkMonitor.withCsvMonitoring
 import it.unibo.pslab.network.mqtt.MqttNetwork
@@ -18,10 +18,10 @@ import cats.data.NonEmptyList
 import cats.effect.{ ExitCode, IO, IOApp }
 import cats.effect.std.Console
 import cats.syntax.all.*
+import upickle.default
 import upickle.default.ReadWriter
 
 import MatMulMasterWorker.*
-import upickle.default
 
 object MatMulMasterWorker:
   type Master <: { type Tie <: via[AnyProtocol toMultiple Worker] }

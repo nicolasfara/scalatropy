@@ -1,6 +1,6 @@
 package it.unibo.pslab.libraries
 
-import it.unibo.pslab.multiparty.MultiParty
+import it.unibo.pslab.multiparty.{ Label, MultiParty }
 import it.unibo.pslab.multiparty.MultiParty.*
 import it.unibo.pslab.network.Codable
 import it.unibo.pslab.peers.Peers.{ CommunicationProtocolCompliance, PeerTag, TiedWithMultiple, TiedWithSingle }
@@ -8,7 +8,6 @@ import it.unibo.pslab.peers.Peers.{ CommunicationProtocolCompliance, PeerTag, Ti
 import cats.Monad
 import cats.data.NonEmptyList
 import cats.syntax.all.*
-import it.unibo.pslab.multiparty.Label
 
 object SyncLibrary:
 
